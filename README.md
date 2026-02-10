@@ -79,8 +79,37 @@
     ```bash
     sail artisan migrate:fresh --seed
     ```
+    このコマンドの入力後、下記のエラーが表示されることがあります。
+    ```bash
+       Illuminate\Database\QueryException 
+      SQLSTATE[HY000] [1044] Access denied for user 'sail'@'%' to database 'contact-form-app' (Connection: mysql, SQL: select table_name as `name`,         (data_length + index_length) as `size`, table_comment as `comment`, engine as `engine`, table_collation as `collation` from information_schema.tables where table_schema = 'contact-form-app' and table_type in ('BASE TABLE', 'SYSTEM VERSIONED') order by table_name)
 
-7. **フロントエンドのビルド**
+      at vendor/laravel/framework/src/Illuminate/Database/Connection.php:829
+        825▕                     $this->getName(), $query, $this->prepareBindings($bindings), $e
+        826▕                 );
+        827▕             }
+        828▕ 
+      ➜ 829▕             throw new QueryException(
+        830▕                 $this->getName(), $query, $this->prepareBindings($bindings), $e
+        831▕             );
+        832▕         }
+        833▕     }
+
+      +43 vendor frames 
+
+      44  artisan:35
+          Illuminate\Foundation\Console\Kernel::handle()
+    ```
+    このエラーはコンテナ内にデータが残っており、エラーが生じているケースなどがあります。
+    その場合は、以下のコマンドを順に実行して各コンテナを再起動して下さい。
+    ```Bash
+    sail down -v
+    sail up -d　//コマンド実行後にSQLコンテナが立ち上がるまで時間がかかります。30秒ほどお待ちください。
+    sail artisan migrate:fresh --seed
+    ```
+    
+
+8. **フロントエンドのビルド**
 
     ```bash
     sail npm install
@@ -90,7 +119,7 @@
 
     `npm run dev` は開発中は起動したままにしてください。
 
-8. **アプリケーションへのアクセス**
+9. **アプリケーションへのアクセス**
 
     ブラウザで [http://localhost](http://localhost) にアクセスします。
 
