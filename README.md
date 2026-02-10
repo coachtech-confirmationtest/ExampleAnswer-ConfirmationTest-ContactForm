@@ -1,6 +1,6 @@
-# お問い合わせシステム (基本編) - ContactForm
+# お問い合わせフォーム - ContactForm
 
-このリポジトリは、お問い合わせシステムの基本的な機能（登録、一覧表示、検索、詳細表示）を実装したLaravelプロジェクトです。
+このリポジトリは、お問い合わせフォームの機能を実装したLaravelプロジェクトです。
 
 ## 動作環境
 
@@ -15,7 +15,6 @@
 
     ```bash
     git clone https://github.com/coachtech-material/ExampleAnswer-ConfirmationTest-ContactForm.git
-    git checkout basic
     ```
 
 2. **.envファイルの準備**
@@ -32,7 +31,7 @@
     DB_CONNECTION=mysql
     DB_HOST=mysql
     DB_PORT=3306
-    DB_DATABASE=bookshelf
+    DB_DATABASE=contact-form-app
     DB_USERNAME=sail
     DB_PASSWORD=password
     ```
