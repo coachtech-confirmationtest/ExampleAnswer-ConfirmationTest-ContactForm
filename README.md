@@ -84,6 +84,7 @@
 
     ```bash
     sail npm install
+    sail npm install alpinejs
     sail npm run dev
     ```
 
