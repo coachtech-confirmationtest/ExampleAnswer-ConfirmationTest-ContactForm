@@ -1,8 +1,8 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\ContactController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\ContactController;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -16,13 +16,13 @@ use App\Http\Controllers\AdminController;
 */
 
 // お問い合わせフォーム
-Route::get("/", [ContactController::class, "index"]);
+Route::get('/', [ContactController::class, 'index']);
 
 // お問い合わせ完了
-Route::get("/thanks", [ContactController::class, "thanks"]);
+Route::get('/thanks', [ContactController::class, 'thanks']);
 
 // 管理画面（認証必須）
-Route::middleware("auth")->group(function () {
-    Route::get("/admin", [AdminController::class, "index"]);
+Route::middleware('auth')->group(function () {
+    Route::get('/admin', [AdminController::class, 'index']);
     Route::get('/contacts/export', [ContactController::class, 'export']);
 });

@@ -2,10 +2,10 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\Contact;
 use App\Models\Category;
+use App\Models\Contact;
 use Faker\Factory as Faker;
+use Illuminate\Database\Seeder;
 
 class ContactSeeder extends Seeder
 {
@@ -25,7 +25,7 @@ class ContactSeeder extends Seeder
                 'gender' => $faker->numberBetween(1, 3),
                 'email' => $faker->unique()->safeEmail,
                 'tel' => $faker->numerify('###########'),
-                'address' => $faker->prefecture . $faker->city . $faker->streetAddress,
+                'address' => $faker->prefecture.$faker->city.$faker->streetAddress,
                 'building' => $faker->optional()->secondaryAddress,
                 'category_id' => $categories->random()->id,
                 'detail' => $faker->realText(120),

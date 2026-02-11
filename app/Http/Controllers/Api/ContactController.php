@@ -37,6 +37,7 @@ class ContactController extends Controller
         }
 
         $contacts = $query->latest()->paginate(7);
+
         return ContactResource::collection($contacts);
     }
 
@@ -48,7 +49,7 @@ class ContactController extends Controller
 
         $contact = Contact::create($validated);
 
-        if (!empty($tagIds)) {
+        if (! empty($tagIds)) {
             $contact->tags()->attach($tagIds);
         }
 
@@ -63,6 +64,7 @@ class ContactController extends Controller
     public function destroy(Contact $contact)
     {
         $contact->delete();
+
         return response()->json(null, Response::HTTP_NO_CONTENT);
     }
 }

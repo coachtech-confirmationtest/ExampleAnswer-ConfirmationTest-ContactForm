@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ExportContactRequest;
-use App\Http\Controllers\Controller;
 use App\Models\Contact;
 
 class ContactController extends Controller
@@ -58,7 +57,7 @@ class ContactController extends Controller
                 };
                 fputcsv($handle, [
                     $contact->id,
-                    $contact->last_name . ' ' . $contact->first_name,
+                    $contact->last_name.' '.$contact->first_name,
                     $genderText,
                     $contact->email,
                     $contact->tel,
@@ -70,7 +69,7 @@ class ContactController extends Controller
                 ]);
             }
             fclose($handle);
-        }, 'contacts_' . now()->format('Ymd_His') . '.csv', [
+        }, 'contacts_'.now()->format('Ymd_His').'.csv', [
             'Content-Type' => 'text/csv',
         ]);
     }

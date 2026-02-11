@@ -30,8 +30,6 @@ class Contact extends Model
     /**
      * ContactモデルとCategoryモデルの関連を定義します。
      * 1つのコンタクトは1つのカテゴリーに属します。
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
     public function category(): BelongsTo
     {
