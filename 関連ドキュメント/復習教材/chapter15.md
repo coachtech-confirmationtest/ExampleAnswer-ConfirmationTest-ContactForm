@@ -1,63 +1,64 @@
-
-# Chapter 15: 鉄壁の品質保証 - Laravelの自動テストをマスターする
+# Chapter 15: 鉄壁の品質保証 - Laravelの自動テストをマスターする 🛡️
 
 ## 1. はじめに 📖
 
-お疲れ様です！これまで、お問い合わせ管理システムの全機能を実装してきました。しかし、プロのエンジニアの仕事は「作って終わり」ではありません。作成したアプリケーションが仕様通りに正しく動作することを保証し、将来の機能追加や変更によって既存の機能が壊れていないことを確認し続ける「品質保証」が極めて重要になります。
+おめでとうございます！ついに最終チャプターです。このチャプターでは、これまで作り上げてきた「お問い合わせ管理システム」の品質を保証するための「自動テスト」を実装します。自動テストは、一度書けば何度でも同じ検証を瞬時に実行してくれる、品質保証の強力な武器です。デグレード（機能改修によって既存の機能が壊れること）を防ぎ、自信を持ってアプリケーションをリリースするために不可欠なスキルです。
 
-このチャプターでは、その品質保証の根幹をなす「自動テスト」の実装方法を学びます。Laravelに標準で搭載されているテストフレームワーク「PHPUnit」を使い、これまで実装してきた全ての機能が正しく動作することをコードで証明していきます。
-
-このチャプターを終える頃には、あなたは単に機能を作れるだけでなく、その品質を自ら保証できる、市場価値の高いエンジニアへと成長していることでしょう。
+このチャプターを終える頃には、あなたはLaravelのテスト機能を使いこなし、堅牢なアプリケーションを構築する術を身につけているでしょう。
 
 ## 2. テストの全体像 🗺️
 
 Laravelのテストは、大きく分けて2種類あります。
 
-- **単体テスト (Unit Test)**: アプリケーションの非常に小さな、独立した一部分をテストします。例えば、モデルのリレーション定義が正しいか、リクエストクラスのバリデーションルールが意図通りか、といった個別のコンポーネントを対象とします。部品単体の品質を保証するイメージです。
-- **機能テスト (Feature Test)**: 複数のコンポーネントが連携した、より大きな機能単位をテストします。例えば、ユーザーがフォームを送信してからデータベースに保存されるまでの一連の流れや、APIエンドポイントが正しいレスポンスを返すか、といったユーザーの操作に近い視点でテストします。製品としての機能が正しく動くかを保証するイメージです。
+- **単体テスト (Unit Tests)**: モデルやリクエストクラスなど、アプリケーションの比較的小さな「部品（ユニット）」が、それぞれ単体で正しく動作するかを検証します。
+- **機能テスト (Feature Tests)**: 複数の部品が連携して、一つの「機能」として正しく動作するかを検証します。実際にHTTPリクエストを送信し、ユーザーの操作をシミュレートします。
 
-これらのテストは、`tests`ディレクトリ配下に、それぞれ`Unit`と`Feature`というサブディレクトリを作成して管理するのが一般的です。
+このチャプターでは、両方のテストをバランス良く実装していきます。
 
 ## 3. テストの準備 🛠️
 
-### 3.1 テスト用データベースの設定
+テストを実行する前に、テスト専用のデータベース設定を行います。これにより、開発用のデータベースを汚すことなく、安全にテストを実行できます。
 
-テストを実行する際、開発用のデータベースを汚さずに、テスト専用のクリーンなデータベース環境を使用するのがベストプラクティスです。
-
-Laravelでは、`phpunit.xml`ファイルでテスト環境の設定を行います。ファイルを開いて、`<php>`セクションを確認してください。
+プロジェクトのルートにある`phpunit.xml`ファイルを開き、`<php>`セクションに以下の`<env>`変数を追加または確認してください。
 
 **phpunit.xml**
 ```xml
-<php>
-    <env name="APP_ENV" value="testing"/>
-    <env name="BCRYPT_ROUNDS" value="4"/>
-    <env name="CACHE_DRIVER" value="array"/>
-    <!-- <env name="DB_CONNECTION" value="sqlite"/> -->
-    <!-- <env name="DB_DATABASE" value=":memory:"/> -->
-    <env name="MAIL_MAILER" value="array"/>
-    <env name="QUEUE_CONNECTION" value="sync"/>
-    <env name="SESSION_DRIVER" value="array"/>
-    <env name="TELESCOPE_ENABLED" value="false"/>
-</php>
+<phpunit ...>
+    <testsuites>
+        ...
+    </testsuites>
+    <source>
+        ...
+    </source>
+    <php>
+        <env name="APP_ENV" value="testing"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <env name="CACHE_DRIVER" value="array"/>
+        <!-- <env name="DB_CONNECTION" value="sqlite"/> -->
+        <!-- <env name="DB_DATABASE" value=":memory:"/> -->
+        <env name="DB_CONNECTION" value="mysql"/>
+        <env name="DB_DATABASE" value="contact_form_test"/>
+        <env name="MAIL_MAILER" value="array"/>
+        <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="SESSION_DRIVER" value="array"/>
+        <env name="TELESCOPE_ENABLED" value="false"/>
+    </php>
+</phpunit>
 ```
 
-#### コードリーディング
-- `<env name="APP_ENV" value="testing"/>`: テスト実行時には、アプリケーションの環境(`APP_ENV`)が`testing`になります。これにより、`config/app.php`などで`testing`環境専用の設定を読み込むことができます。
-- `DB_CONNECTION`と`DB_DATABASE`: デフォルトではコメントアウトされています。この状態だと、`.env`ファイルで設定されたデータベースが使用されます。テスト実行時だけ異なるデータベース（例えばSQLiteのインメモリデータベース）を使いたい場合は、ここのコメントを外して設定します。
+### コード解説
+- `<env name="APP_ENV" value="testing"/>`: Laravelに、現在の環境がテスト環境であることを伝えます。
+- `<env name="DB_CONNECTION" value="mysql"/>`: テストに使用するデータベースの種類を指定します。
+- `<env name="DB_DATABASE" value="contact_form_test"/>`: テスト専用のデータベース名を指定します。このデータベースは事前に作成しておく必要があります。
 
-今回は、テスト実行のたびにデータベースを初期化してくれる`RefreshDatabase`トレイトを使用するため、開発用データベースをそのまま使っても問題ありませんが、高速なインメモリデータベースである`SQLite`を使用することも一般的です。
-
-今回は、模範解答の構成に合わせ、`.env`ファイルの設定（MySQL）をそのまま利用して進めます。
+> **💡 なぜインメモリDB（sqlite, :memory:）を使わないの？**
+> インメモリデータベースは高速ですが、MySQLなどの実際の運用環境とは挙動が異なる場合があります。特に、MySQL特有の関数や制約を使用している場合、テストが通っても本番でエラーになる可能性があります。今回は、より本番環境に近い形でテストを行うため、MySQLを使用します。
 
 ## 4. Factoryの作成 🏭
 
-テストを実行する際には、前提条件となるテストデータ（例: ユーザー、カテゴリ、お問い合わせ情報など）が必要になります。これらのデータを毎回手動で作成するのは非常に手間がかかります。そこで活躍するのが「Factory」です。
+テストを実行するには、テストデータが必要です。Factoryは、モデルに対応するダミーデータを簡単に生成するための仕組みです。
 
-Factoryは、モデルに対応するダミーデータを簡単に、かつ大量に生成するための仕組みです。これから作成するテストコードの様々な場面で利用します。
-
-### 4.1 CategoryFactoryの作成
-
-まず、カテゴリのFactoryを作成します。
+### 4.1 CategoryFactory
 
 ```bash
 php artisan make:factory CategoryFactory --model=Category
@@ -71,16 +72,18 @@ php artisan make:factory CategoryFactory --model=Category
 
 namespace Database\Factories;
 
-use App\Models\Category;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<Category>
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Category>
  */
 class CategoryFactory extends Factory
 {
-    protected $model = Category::class;
-
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
     public function definition(): array
     {
         return [
@@ -90,14 +93,11 @@ class CategoryFactory extends Factory
 }
 ```
 
-#### コード解説
-- `protected $model = Category::class;`: このFactoryが`App\Models\Category`モデルに対応することを定義しています。
-- `definition()`: このメソッド内に、生成するダミーデータの定義を記述します。
-- `$this->faker->words(3, true)`: Laravelに組み込まれているダミーデータ生成ライブラリ「Faker」を使って、ランダムな3つの単語を文字列として生成します。
+### コード解説
+- `definition()`: このFactoryを使ってモデルが作成される際の、デフォルトのデータ構造を定義します。
+- `$this->faker->words(3, true)`: PHPのダミーデータ生成ライブラリ「Faker」を使って、ランダムな3つの単語を文字列として生成します。
 
-### 4.2 ContactFactoryの作成
-
-次にお問い合わせのFactoryです。カテゴリとのリレーションもここで定義します。
+### 4.2 ContactFactory
 
 ```bash
 php artisan make:factory ContactFactory --model=Contact
@@ -112,16 +112,18 @@ php artisan make:factory ContactFactory --model=Contact
 namespace Database\Factories;
 
 use App\Models\Category;
-use App\Models\Contact;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<Contact>
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Contact>
  */
 class ContactFactory extends Factory
 {
-    protected $model = Contact::class;
-
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
     public function definition(): array
     {
         return [
@@ -129,25 +131,23 @@ class ContactFactory extends Factory
             'first_name' => $this->faker->firstName(),
             'last_name' => $this->faker->lastName(),
             'gender' => $this->faker->numberBetween(1, 3),
-            'email' => $this->faker->unique()->safeEmail(),
-            'tel' => $this->faker->numerify('0##########'),
-            'address' => $this->faker->streetAddress(),
+            'email' => $this->faker->safeEmail(),
+            'tel' => $this->faker->numerify('###########'),
+            'address' => $this->faker->address(),
             'building' => $this->faker->optional()->secondaryAddress(),
-            'detail' => $this->faker->text(60),
+            'detail' => $this->faker->realText(),
         ];
     }
 }
 ```
 
-#### コード解説
-- `'category_id' => Category::factory()`: `Contact`を作成する際に、関連する`Category`も同時に作成します。`CategoryFactory`が呼び出され、作成された`Category`のIDが`category_id`に自動的に設定されます。
-- `$this->faker->...`: Fakerを使って、氏名、性別、メールアドレスなど、リアルなダミーデータを生成しています。
-- `unique()`: `email`がデータベース内で一意になるようにします。
-- `optional()`: `building`カラムのように、`null`を許容するカラムに対して、50%の確率で`null`を、50%の確率でダミーデータを生成します。
+### コード解説
+- `'category_id' => Category::factory()`: `Contact`モデルは`Category`モデルに属しているため、`Contact`を作成する際に、関連する`Category`も自動で作成するように定義しています。
+- `$this->faker->firstName()`: Fakerを使って、リアルな「名」を生成します。
+- `$this->faker->numerify('###########')`: ` #` をランダムな数字（0-9）に置き換えます。ここでは11桁の電話番号を生成しています。
+- `$this->faker->optional()->secondaryAddress()`: 50%の確率で`null`を、そうでなければ建物の部屋番号などを生成します。`building`カラムが`nullable`な場合に対応できます。
 
-### 4.3 TagFactoryの作成
-
-最後にタグのFactoryを作成します。
+### 4.3 TagFactory
 
 ```bash
 php artisan make:factory TagFactory --model=Tag
@@ -161,33 +161,33 @@ php artisan make:factory TagFactory --model=Tag
 
 namespace Database\Factories;
 
-use App\Models\Tag;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<Tag>
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Tag>
  */
 class TagFactory extends Factory
 {
-    protected $model = Tag::class;
-
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
     public function definition(): array
     {
         return [
-            'name' => $this->faker->unique()->words(2, true),
+            'name' => $this->faker->word(),
         ];
     }
 }
 ```
 
-#### コード解説
-- `'name' => $this->faker->unique()->words(2, true)`: `Tag`モデルの`name`カラムに、ユニークな2つの単語からなる文字列を生成します。
-
-これで、テストデータを自在に生成する準備が整いました。
+### コード解説
+- `$this->faker->word()`: ランダムな一つの単語を生成します。
 
 ## 5. 単体テスト (Unit Tests) の作成 🔬
 
-ここからは、アプリケーションの各部品が正しく機能するかを個別にテストしていきます。
+まずは、アプリケーションの最小単位である「モデル」「リクエスト」「リソース」が正しく動作するかを検証する単体テストから作成します。
 
 ### 5.1 Models
 
@@ -219,21 +219,21 @@ class CategoryTest extends TestCase
     public function test_category_has_many_contacts(): void
     {
         $category = Category::factory()->create();
-        Contact::factory()->count(2)->for($category)->create();
+        Contact::factory()->for($category)->count(3)->create();
 
-        $this->assertCount(2, $category->fresh()->contacts);
+        $this->assertCount(3, $category->contacts);
         $this->assertInstanceOf(Contact::class, $category->contacts->first());
     }
 }
 ```
 
 #### コード解説
-- `use RefreshDatabase;`: このトレイトを使用すると、各テストメソッドの実行前にデータベースがマイグレーションされ、実行後にはロールバックされます。これにより、各テストが独立したクリーンな状態で実行されることが保証されます。
-- `test_category_has_many_contacts()`: テストメソッド名は`test_`で始めるのが規約です。メソッド名で「何をテストしているか」を明確に表現します。
-- `$category = Category::factory()->create();`: `CategoryFactory`を使って、テスト用のカテゴリを1つ作成します。
-- `Contact::factory()->count(2)->for($category)->create();`: `ContactFactory`を使って、先ほど作成した`$category`に紐づくお問い合わせを2つ作成します。
-- `$this->assertCount(2, $category->fresh()->contacts);`: `$category`に紐づく`contacts`の数が2件であることをアサート（表明）します。`fresh()`メソッドでデータベースから最新の状態を取得しています。
-- `$this->assertInstanceOf(Contact::class, $category->contacts->first());`: `$category`の`contacts`リレーションの最初の要素が、`App\Models\Contact`クラスのインスタンスであることをアサートします。これにより、`hasMany`リレーションが正しく設定されていることを確認できます。
+- `use RefreshDatabase;`: このトレイトを使用すると、各テストメソッドの実行前にデータベースがマイグレーションされ、実行後にロールバックされます。これにより、他のテストの影響を受けないクリーンな状態でテストを実行できます。
+- `test_category_has_many_contacts()`: `Category`モデルが`contacts`リレーション（一対多）を正しく持っているかをテストします。
+- `$category = Category::factory()->create();`: テスト対象のカテゴリを1つ作成します。
+- `Contact::factory()->for($category)->count(3)->create();`: 作成したカテゴリに属するお問い合わせを3つ作成します。
+- `$this->assertCount(3, $category->contacts);`: `$category->contacts`（リレーション経由で取得したお問い合わせのコレクション）の件数が3件であることをアサート（断言）します。
+- `$this->assertInstanceOf(Contact::class, $category->contacts->first());`: コレクションの最初の要素が`Contact`クラスのインスタンスであることをアサートし、リレーションが正しいモデルを返していることを確認します。
 
 #### 5.1.2 Contactモデルのテスト
 
@@ -259,11 +259,12 @@ class ContactTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_contact_belongs_to_category(): void
+    public function test_contact_belongs_to_a_category(): void
     {
         $category = Category::factory()->create();
         $contact = Contact::factory()->for($category)->create();
 
+        $this->assertInstanceOf(Category::class, $contact->category);
         $this->assertTrue($contact->category->is($category));
     }
 
@@ -271,22 +272,19 @@ class ContactTest extends TestCase
     {
         $contact = Contact::factory()->create();
         $tags = Tag::factory()->count(2)->create();
-
-        $contact->tags()->attach($tags->pluck('id'));
-        $contact->load('tags');
+        $contact->tags()->attach($tags);
 
         $this->assertCount(2, $contact->tags);
-        $this->assertTrue($contact->tags->pluck('id')->contains($tags->first()->id));
+        $this->assertInstanceOf(Tag::class, $contact->tags->first());
     }
 }
 ```
 
 #### コード解説
-- `test_contact_belongs_to_category()`: `Contact`モデルの`belongsTo`リレーションをテストします。
-- `$this->assertTrue($contact->category->is($category));`: `$contact`の`category`リレーションが、期待される`$category`インスタンスと同一であることをアサートします。
-- `test_contact_belongs_to_many_tags()`: `Contact`モデルの`belongsToMany`リレーションをテストします。
-- `$contact->tags()->attach($tags->pluck('id'));`: `attach`メソッドを使って、`$contact`に複数の`$tags`を紐付けます。
-- `$this->assertCount(2, $contact->tags);`: 紐付けられたタグの数が2件であることを確認します。
+- `test_contact_belongs_to_a_category()`: `Contact`モデルが`category`リレーション（多対一）を正しく持っているかをテストします。
+- `$this->assertTrue($contact->category->is($category));`: 2つのモデルインスタンスが同じ（同じ主キーを持つ同じテーブルのレコード）であるかをアサートします。
+- `test_contact_belongs_to_many_tags()`: `Contact`モデルが`tags`リレーション（多対多）を正しく持っているかをテストします。
+- `$contact->tags()->attach($tags);`: `Contact`に複数の`Tag`を紐付けます。
 
 #### 5.1.3 Tagモデルのテスト
 
@@ -314,19 +312,17 @@ class TagTest extends TestCase
     public function test_tag_belongs_to_many_contacts(): void
     {
         $tag = Tag::factory()->create();
-        $contacts = Contact::factory()->count(2)->create();
+        $contacts = Contact::factory()->count(3)->create();
+        $tag->contacts()->attach($contacts);
 
-        $tag->contacts()->attach($contacts->pluck('id')->toArray());
-        $tag->load('contacts');
-
-        $this->assertCount(2, $tag->contacts);
-        $this->assertTrue($tag->contacts->pluck('id')->contains($contacts->first()->id));
+        $this->assertCount(3, $tag->contacts);
+        $this->assertInstanceOf(Contact::class, $tag->contacts->first());
     }
 }
 ```
 
 #### コード解説
-- `test_tag_belongs_to_many_contacts()`: `Tag`モデルの`belongsToMany`リレーションをテストします。`Contact`モデルのテストと同様に、`attach`メソッドでリレーションを構築し、その結果をアサートしています。
+- `test_tag_belongs_to_many_contacts()`: `Tag`モデルが`contacts`リレーション（多対多）を正しく持っているかをテストします。
 
 ### 5.2 Requests
 
@@ -811,7 +807,6 @@ php artisan make:test ContactPageTest
 
 namespace Tests\Feature;
 
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -819,7 +814,7 @@ class ContactPageTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_contact_page_is_accessible(): void
+    public function test_contact_index_page_is_accessible(): void
     {
         $response = $this->get("/");
 
@@ -827,20 +822,12 @@ class ContactPageTest extends TestCase
         $response->assertViewIs("contact.index");
     }
 
-    public function test_admin_page_is_inaccessible_for_guests(): void
+    public function test_contact_thanks_page_is_accessible(): void
     {
-        $response = $this->get("/admin");
-
-        $response->assertRedirect("/login");
-    }
-
-    public function test_admin_page_is_accessible_for_logged_in_users(): void
-    {
-        $user = User::factory()->create();
-
-        $response = $this->actingAs($user)->get("/admin");
+        $response = $this->get("/thanks");
 
         $response->assertOk();
+        $response->assertViewIs("contact.thanks");
     }
 }
 ```
@@ -849,8 +836,7 @@ class ContactPageTest extends TestCase
 - `$this->get("/")`: アプリケーションのルートURL（`/`）に対してGETリクエストを送信します。
 - `$response->assertOk()`: レスポンスのHTTPステータスコードが200 OKであることをアサートします。
 - `$response->assertViewIs("contact.index")`: レスポンスとして`contact.index`ビューが返されたことをアサートします。
-- `test_admin_page_is_inaccessible_for_guests()`: 未ログインのユーザー（ゲスト）が`/admin`にアクセスした場合、`/login`にリダイレクトされることを`assertRedirect()`でテストします。
-- `test_admin_page_is_accessible_for_logged_in_users()`: `actingAs($user)`で指定したユーザーとしてログインした状態でリクエストを送信します。ログイン済みユーザーは`/admin`にアクセスできること（200 OK）をテストします。
+- `test_contact_thanks_page_is_accessible()`: サンクスページ(`/thanks`)が正常に表示されることをテストします。
 
 #### 6.1.2 管理画面コントローラーのテスト
 
@@ -874,7 +860,7 @@ class AdminControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_index_is_accessible_for_authenticated_users(): void
+    public function test_authenticated_user_can_view_admin_dashboard(): void
     {
         $user = User::factory()->create();
 
@@ -887,7 +873,8 @@ class AdminControllerTest extends TestCase
 ```
 
 #### コード解説
-- `ContactPageTest`と同様に、認証済みのユーザーが`/admin`にアクセスし、`admin.index`ビューが返されることをテストしています。
+- `actingAs($user)`: 指定したユーザーとしてログインした状態でリクエストを送信します。
+- `test_authenticated_user_can_view_admin_dashboard()`: 認証済みのユーザーが`/admin`にアクセスし、`admin.index`ビューが返されることをテストしています。
 
 #### 6.1.3 CSVエクスポート機能のテスト
 
@@ -906,6 +893,7 @@ namespace Tests\Feature;
 use App\Models\Category;
 use App\Models\Contact;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -913,41 +901,83 @@ class ContactExportTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_export_downloads_csv_with_filtered_contacts(): void
+    public function test_authenticated_user_can_export_filtered_contacts(): void
     {
         $user = User::factory()->create();
-        $category = Category::factory()->create();
+        $categoryA = Category::factory()->create(["content" => "Delivery"]);
+        $categoryB = Category::factory()->create(["content" => "Exchange"]);
 
-        $matchingContact = Contact::factory()->for($category)->create([
-            "first_name" => "Taro",
+        Contact::factory()->for($categoryA)->create([
+            "first_name" => "John",
+            "last_name" => "Smith",
             "gender" => 1,
+            "email" => "john@example.com",
+            "created_at" => Carbon::parse("2024-02-10 10:00:00"),
         ]);
 
-        Contact::factory()->create(["gender" => 2]);
+        Contact::factory()->for($categoryB)->create([
+            "first_name" => "Alice",
+            "last_name" => "Jones",
+            "gender" => 2,
+            "email" => "alice@example.com",
+            "created_at" => Carbon::parse("2024-02-11 10:00:00"),
+        ]);
 
-        $response = $this->actingAs($user)->get("/admin/contacts/export?gender=1&category_id=" . $category->id);
+        $response = $this->actingAs($user)->get("/contacts/export?keyword=Smith&gender=1&category_id=" . $categoryA->id . "&date=2024-02-10");
 
         $response->assertOk();
         $response->assertHeader("Content-Type", "text/csv; charset=UTF-8");
 
         $content = $response->streamedContent();
 
-        $this->assertStringContainsString(chr(0xEF) . chr(0xBB) . chr(0xBF), $content);
-        $this->assertStringContainsString("Taro", $content);
-        $this->assertStringNotContainsString("Jiro", $content);
+        $this->assertStringContainsString("Smith John", $content);
+        $this->assertStringContainsString($categoryA->content, $content);
+        $this->assertStringNotContainsString("Jones Alice", $content);
+    }
+
+    public function test_export_without_filters_returns_all_contacts_in_latest_order(): void
+    {
+        $user = User::factory()->create();
+
+        $older = Contact::factory()->create([
+            "first_name" => "Eve",
+            "last_name" => "Adams",
+            "created_at" => Carbon::parse("2024-02-01 08:00:00"),
+        ]);
+
+        $newer = Contact::factory()->create([
+            "first_name" => "Mark",
+            "last_name" => "Brown",
+            "created_at" => Carbon::parse("2024-02-02 08:00:00"),
+        ]);
+
+        $response = $this->actingAs($user)->get("/contacts/export");
+
+        $response->assertOk();
+        $content = $response->streamedContent();
+
+        $this->assertStringContainsString("Adams Eve", $content);
+        $this->assertStringContainsString("Brown Mark", $content);
+
+        $lines = array_values(array_filter(explode("\n", trim($content))));
+        $firstLine = ltrim($lines[0] ?? ", "\xEF\xBB\xBF");
+
+        $this->assertStringContainsString("Brown Mark", $firstLine);
+        $this->assertStringContainsString("Adams Eve", $lines[1] ?? ");
     }
 }
 ```
 
 #### コード解説
-- `$matchingContact`: 検索条件に一致するテストデータを作成します。
-- `Contact::factory()->create(["gender" => 2]);`: 検索条件に一致しないテストデータも作成します。
-- `$response = $this->actingAs($user)->get("/admin/contacts/export?gender=1&category_id=" . $category->id);`: クエリパラメータで検索条件を指定してエクスポートエンドポイントにリクエストを送信します。
+- `test_authenticated_user_can_export_filtered_contacts()`: 検索条件でフィルタリングされた結果が正しくエクスポートされるかをテストします。
 - `$response->assertHeader("Content-Type", "text/csv; charset=UTF-8");`: レスポンスヘッダーがCSV形式であることを確認します。
 - `$content = $response->streamedContent();`: ストリーム形式で返されるレスポンスの内容を取得します。
-- `$this->assertStringContainsString(chr(0xEF) . chr(0xBB) . chr(0xBF), $content);`: レスポンスの先頭にBOM（バイトオーダーマーク）が付与されているかを確認し、文字化けを防ぐ対策がされていることをテストします。
-- `$this->assertStringContainsString("Taro", $content);`: レスポンスに、条件に一致するデータ（`Taro`）が含まれていることを確認します。
-- `$this->assertStringNotContainsString("Jiro", $content);`: レスポンスに、条件に一致しないデータ（`Jiro`）が含まれていないことを確認します。
+- `$this->assertStringContainsString(...)`: CSVの内容に、条件に一致するデータが含まれていることを確認します。
+- `$this->assertStringNotContainsString(...)`: CSVの内容に、条件に一致しないデータが含まれていないことを確認します。
+- `test_export_without_filters_returns_all_contacts_in_latest_order()`: フィルタを指定しない場合に、全てのデータが最新順でエクスポートされるかをテストします。
+- `explode("\n", trim($content))`: CSVの内容を改行で分割し、各行を配列として取得します。
+- `ltrim($lines[0] ?? ", "\xEF\xBB\xBF")`: 1行目の先頭にある可能性のあるBOM（バイトオーダーマーク）を除去します。
+- 1行目に最新のデータ（`Brown Mark`）が、2行目に古いデータ（`Adams Eve`）が含まれていることを確認し、ソート順を検証します。
 
 ### 6.2 APIエンドポイント
 
@@ -975,12 +1005,16 @@ class CategoryControllerTest extends TestCase
 
     public function test_index_returns_all_categories(): void
     {
-        Category::factory()->count(3)->create();
+        $categories = Category::factory()->count(3)->create();
 
         $response = $this->getJson("/api/categories");
 
         $response->assertOk();
         $response->assertJsonCount(3, "data");
+        $response->assertJsonFragment([
+            "id" => $categories->first()->id,
+            "content" => $categories->first()->content,
+        ]);
     }
 }
 ```
@@ -988,6 +1022,7 @@ class CategoryControllerTest extends TestCase
 #### コード解説
 - `$this->getJson("/api/categories")`: 指定したAPIエンドポイントにGETリクエストを送信し、JSON形式のレスポンスを期待します。
 - `$response->assertJsonCount(3, "data");`: レスポンスJSONの`data`キー配下の要素が3つであることをアサートします。
+- `$response->assertJsonFragment([...])`: レスポンスJSONの中に、指定したキーと値のペアを持つ断片が含まれていることをアサートします。
 
 #### 6.2.2 お問い合わせAPIのテスト
 
@@ -1006,6 +1041,7 @@ namespace Tests\Feature\Api;
 use App\Models\Category;
 use App\Models\Contact;
 use App\Models\Tag;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -1013,18 +1049,40 @@ class ContactControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_index_returns_paginated_contacts(): void
+    public function test_index_applies_all_available_filters(): void
     {
-        Contact::factory()->count(20)->create();
+        $category = Category::factory()->create(["content" => "Delivery"]);
+        $otherCategory = Category::factory()->create(["content" => "Other"]);
 
-        $response = $this->getJson("/api/contacts");
+        $matching = Contact::factory()->for($category)->create([
+            "first_name" => "Ken",
+            "last_name" => "Ito",
+            "gender" => 1,
+            "email" => "ken@example.com",
+            "created_at" => Carbon::parse("2024-02-01 09:00:00"),
+        ]);
+
+        Contact::factory()->for($otherCategory)->create([
+            "first_name" => "Jane",
+            "last_name" => "Smith",
+            "gender" => 2,
+            "email" => "jane@example.com",
+            "created_at" => Carbon::parse("2024-02-02 09:00:00"),
+        ]);
+
+        $tag = Tag::factory()->create();
+        $matching->tags()->attach($tag);
+
+        $response = $this->getJson("/api/contacts?keyword=Ken&gender=1&category_id=" . $category->id . "&date=2024-02-01");
 
         $response->assertOk();
-        $response->assertJsonCount(10, "data");
-        $response->assertJsonPath("meta.total", 20);
+        $response->assertJsonCount(1, "data");
+        $response->assertJsonPath("data.0.id", $matching->id);
+        $response->assertJsonPath("data.0.category.id", $category->id);
+        $response->assertJsonPath("meta.total", 1);
     }
 
-    public function test_store_creates_new_contact_with_tags(): void
+    public function test_store_persists_contact_and_attaches_tags(): void
     {
         $category = Category::factory()->create();
         $tags = Tag::factory()->count(2)->create();
@@ -1034,50 +1092,68 @@ class ContactControllerTest extends TestCase
             "last_name" => "Yamada",
             "gender" => 1,
             "email" => "taro@example.com",
-            "tel" => "09012345678",
+            "tel" => "0312345678",
             "address" => "Tokyo",
+            "building" => "Sunshine 60",
             "category_id" => $category->id,
-            "detail" => "Test inquiry",
+            "detail" => "お問い合わせ内容です",
             "tag_ids" => $tags->pluck("id")->toArray(),
         ];
 
         $response = $this->postJson("/api/contacts", $payload);
 
         $response->assertCreated();
-        $this->assertDatabaseHas("contacts", ["email" => "taro@example.com"]);
-        $this->assertDatabaseCount("contact_tag", 2);
+        $this->assertDatabaseHas("contacts", [
+            "email" => "taro@example.com",
+            "category_id" => $category->id,
+        ]);
+
+        $contact = Contact::where("email", "taro@example.com")->first();
+        foreach ($tags as $tag) {
+            $this->assertDatabaseHas("contact_tag", [
+                "contact_id" => $contact->id,
+                "tag_id" => $tag->id,
+            ]);
+        }
     }
 
-    public function test_show_returns_a_contact(): void
+    public function test_show_returns_single_contact(): void
     {
-        $contact = Contact::factory()->create();
+        $category = Category::factory()->create(["content" => "Support"]);
+        $contact = Contact::factory()->for($category)->create([
+            "first_name" => "Mika",
+            "last_name" => "Suzuki",
+        ]);
 
-        $response = $this->getJson("/api/contacts/{$contact->id}");
+        $response = $this->getJson("/api/contacts/" . $contact->id);
 
         $response->assertOk();
         $response->assertJsonPath("data.id", $contact->id);
+        $response->assertJsonPath("data.category.id", $category->id);
     }
 
-    public function test_destroy_deletes_a_contact(): void
+    public function test_destroy_removes_contact(): void
     {
         $contact = Contact::factory()->create();
 
-        $response = $this->deleteJson("/api/contacts/{$contact->id}");
+        $response = $this->deleteJson("/api/contacts/" . $contact->id);
 
         $response->assertNoContent();
-        $this->assertDatabaseMissing("contacts", ["id" => $contact->id]);
+        $this->assertDatabaseMissing("contacts", [
+            "id" => $contact->id,
+        ]);
     }
 }
 ```
 
 #### コード解説
-- `test_index_returns_paginated_contacts()`: `index`アクションがページネーションされた結果を返すことをテストします。デフォルトでは1ページあたり10件なので、`assertJsonCount(10, "data")`で確認し、`meta.total`で総数が20件であることを確認します。
-- `test_store_creates_new_contact_with_tags()`: `store`アクションをテストします。
-- `$this->postJson("/api/contacts", $payload)`: `$payload`をリクエストボディとしてPOSTリクエストを送信します。
-- `$response->assertCreated()`: レスポンスのステータスコードが201 Createdであることをアサートします。
+- `test_index_applies_all_available_filters()`: `index`アクションが、全ての検索フィルタ（キーワード、性別、カテゴリ、日付）を正しく適用して結果を返すことをテストします。
+- `$response->assertJsonPath("data.0.id", $matching->id)`: JSONレスポンスの特定のパス（`data`配列の0番目の要素の`id`）が、期待した値（`$matching->id`）であることをアサートします。
+- `test_store_persists_contact_and_attaches_tags()`: `store`アクションが、お問い合わせデータを作成し、関連するタグを中間テーブルに正しく保存することをテストします。
 - `$this->assertDatabaseHas("contacts", ...)`: `contacts`テーブルに指定したデータが存在することを確認します。
-- `$this->assertDatabaseCount("contact_tag", 2)`: 中間テーブル`contact_tag`にレコードが2件作成されたことを確認し、多対多リレーションが正しく保存されたことをテストします。
-- `test_destroy_deletes_a_contact()`: `destroy`アクションをテストします。
+- `foreach ($tags as $tag) { ... }`: ループを使って、全てのタグが正しく紐付けられたかを`contact_tag`テーブルで確認します。
+- `test_show_returns_single_contact()`: `show`アクションが、指定したIDのお問い合わせデータを正しく返すことをテストします。
+- `test_destroy_removes_contact()`: `destroy`アクションが、指定したIDのお問い合わせデータをデータベースから削除することをテストします。
 - `$response->assertNoContent()`: レスポンスのステータスコードが204 No Contentであることをアサートします。
 - `$this->assertDatabaseMissing("contacts", ...)`: `contacts`テーブルから指定したデータが削除されたことを確認します。
 
@@ -1105,37 +1181,41 @@ class TagControllerTest extends TestCase
 
     public function test_index_returns_all_tags(): void
     {
-        Tag::factory()->count(5)->create();
+        $tags = Tag::factory()->count(2)->create();
 
         $response = $this->getJson("/api/tags");
 
         $response->assertOk();
-        $response->assertJsonCount(5, "data");
+        $response->assertJsonCount(2, "data");
+        $response->assertJsonFragment([
+            "id" => $tags->first()->id,
+            "name" => $tags->first()->name,
+        ]);
     }
 
-    public function test_store_creates_new_tag(): void
+    public function test_store_creates_tag(): void
     {
-        $response = $this->postJson("/api/tags", ["name" => "new-tag"]);
+        $response = $this->postJson("/api/tags", ["name" => "priority"]);
 
         $response->assertCreated();
-        $this->assertDatabaseHas("tags", ["name" => "new-tag"]);
+        $this->assertDatabaseHas("tags", ["name" => "priority"]);
     }
 
-    public function test_update_modifies_a_tag(): void
+    public function test_update_modifies_tag_name(): void
     {
-        $tag = Tag::factory()->create();
+        $tag = Tag::factory()->create(["name" => "initial"]);
 
-        $response = $this->putJson("/api/tags/{$tag->id}", ["name" => "updated-name"]);
+        $response = $this->putJson("/api/tags/" . $tag->id, ["name" => "updated"]);
 
         $response->assertNoContent();
-        $this->assertDatabaseHas("tags", ["id" => $tag->id, "name" => "updated-name"]);
+        $this->assertDatabaseHas("tags", ["id" => $tag->id, "name" => "updated"]);
     }
 
-    public function test_destroy_deletes_a_tag(): void
+    public function test_destroy_deletes_tag(): void
     {
         $tag = Tag::factory()->create();
 
-        $response = $this->deleteJson("/api/tags/{$tag->id}");
+        $response = $this->deleteJson("/api/tags/" . $tag->id);
 
         $response->assertNoContent();
         $this->assertDatabaseMissing("tags", ["id" => $tag->id]);
@@ -1144,9 +1224,11 @@ class TagControllerTest extends TestCase
 ```
 
 #### コード解説
-- `test_update_modifies_a_tag()`: `update`アクションをテストします。
+- `test_store_creates_tag()`: `store`アクションが、新しいタグをデータベースに保存することをテストします。
+- `$response->assertCreated()`: レスポンスのステータスコードが201 Createdであることをアサートします。
+- `test_update_modifies_tag_name()`: `update`アクションが、指定したタグの名前を更新することをテストします。
 - `$this->putJson(...)`: PUTリクエストを送信します。
-- `$response->assertNoContent()`: 更新や削除が成功した場合、レスポンスボディは不要なため、204 No Contentが返されることをテストします。
+- `test_destroy_deletes_tag()`: `destroy`アクションが、指定したタグをデータベースから削除することをテストします。
 
 ## 7. テストの実行 🏁
 
@@ -1170,7 +1252,7 @@ php artisan test
    ✓ category has many contacts
 
    PASS  Tests\Unit\Models\ContactTest
-   ✓ contact belongs to category
+   ✓ contact belongs to a category
    ✓ contact belongs to many tags
 
    PASS  Tests\Unit\Models\TagTest
@@ -1201,33 +1283,33 @@ php artisan test
    ✓ tag resource structure
 
    PASS  Tests\Feature\AdminControllerTest
-   ✓ index is accessible for authenticated users
+   ✓ authenticated user can view admin dashboard
 
    PASS  Tests\Feature\Api\CategoryControllerTest
    ✓ index returns all categories
 
    PASS  Tests\Feature\Api\ContactControllerTest
-   ✓ index returns paginated contacts
-   ✓ store creates new contact with tags
-   ✓ show returns a contact
-   ✓ destroy deletes a contact
+   ✓ index applies all available filters
+   ✓ store persists contact and attaches tags
+   ✓ show returns single contact
+   ✓ destroy removes contact
 
    PASS  Tests\Feature\Api\TagControllerTest
    ✓ index returns all tags
-   ✓ store creates new tag
-   ✓ update modifies a tag
-   ✓ destroy deletes a tag
+   ✓ store creates tag
+   ✓ update modifies tag name
+   ✓ destroy deletes tag
 
    PASS  Tests\Feature\ContactExportTest
-   ✓ export downloads csv with filtered contacts
+   ✓ authenticated user can export filtered contacts
+   ✓ export without filters returns all contacts in latest order
 
    PASS  Tests\Feature\ContactPageTest
-   ✓ contact page is accessible
-   ✓ admin page is inaccessible for guests
-   ✓ admin page is accessible for logged in users
+   ✓ contact index page is accessible
+   ✓ contact thanks page is accessible
 
-  Tests:  32 passed
-  Time:   1.33s
+  Tests:  28 passed
+  Time:   1.50s
 ```
 
 もし失敗したテスト（FAIL）があれば、エラーメッセージをよく読んで、テストコードまたはアプリケーションコードのどちらに問題があるのかを特定し、修正してください。
