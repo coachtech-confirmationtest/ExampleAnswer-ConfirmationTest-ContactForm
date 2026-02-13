@@ -47,8 +47,8 @@
 | カラム名 | データ型 | 制約 | 役割 |
 | :--- | :--- | :--- | :--- |
 | `id` | `bigIncrements` | 主キー | このリレーションの一意なID。 |
-| `contact_id` | `foreignId` | `constrained`, `onDelete(\'cascade\')` | `contacts`テーブルのIDへの外部キー。問い合わせが削除されたら、このレコードも自動で削除される。 |
-| `tag_id` | `foreignId` | `constrained`, `onDelete(\'cascade\')` | `tags`テーブルのIDへの外部キー。タグが削除されたら、このレコードも自動で削除される。 |
+| `contact_id` | `foreignId` | `constrained`, `onDelete('cascade')` | `contacts`テーブルのIDへの外部キー。問い合わせが削除されたら、このレコードも自動で削除される。 |
+| `tag_id` | `foreignId` | `constrained`, `onDelete('cascade')` | `tags`テーブルのIDへの外部キー。タグが削除されたら、このレコードも自動で削除される。 |
 | `created_at` | `timestamp` | `nullable` | 作成日時。 |
 | `updated_at` | `timestamp` | `nullable` | 更新日時。 |
 | (`contact_id`, `tag_id`) | - | `unique` | 同じ問い合わせに同じタグが複数紐づくことを防ぐ複合ユニークキー。 |
@@ -69,7 +69,7 @@ Laravelには「設定より規約」の文化が根付いています。中間�
 
 中間テーブルの`contact_id`と`tag_id`には、必ず外部キー制約を設定します。これは、データベースレベルでデータの整合性を保証するための非常に重要な仕組みです。外部キー制約があれば、例えば存在しない`contact_id`を持つ`contact_tag`レコードを作成しようとしても、データベースがエラーを返してくれます。これにより、意図しないデータ（孤児レコード）が生まれるのを防ぎ、アプリケーションの堅牢性を高めることができます。
 
-### Point 4: カスケード削除（`onDelete(\'cascade\')`）を検討する
+### Point 4: カスケード削除（`onDelete('cascade')`）を検討する
 
 外部キー制約と合わせて設定を検討すべきなのが「カスケード削除」です。これを設定しておくと、親テーブルのレコード（例: `contacts`テーブルのある問い合わせ）が削除されたときに、それに関連する中間テーブルのレコード（その問い合わせに紐づく全ての`contact_tag`レコード）も自動的に削除されます。これにより、手動で関連レコードを削除する手間が省け、データのクリーンな状態を維持しやすくなります。今回のケースでは、問い合わせやタグが削除されたら、その関連情報も不要になるのが自然なので、カスケード削除を設定するのが適切です。
 
@@ -101,9 +101,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create(\'tags\', function (Blueprint $table) {
+        Schema::create('tags', function (Blueprint $table) {
             $table->id();
-            $table->string(\'name\', 50)->unique();
+            $table->string('name', 50)->unique();
             $table->timestamps();
         });
     }
@@ -113,7 +113,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists(\'tags\');
+        Schema::dropIfExists('tags');
     }
 };
 ```
@@ -142,14 +142,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create(\'contact_tag\', function (Blueprint $table) {
+        Schema::create('contact_tag', function (Blueprint $table) {
             $table->id();
-            $table->foreignId(\'contact_id\')->constrained()->onDelete(\'cascade\');
-            $table->foreignId(\'tag_id\')->constrained()->onDelete(\'cascade\');
+            $table->foreignId('contact_id')->constrained()->onDelete('cascade');
+            $table->foreignId('tag_id')->constrained()->onDelete('cascade');
             $table->timestamps();
 
             // 同一の組み合わせが複数登録されることを防ぐ
-            $table->unique([\'contact_id\', \'tag_id\']);
+            $table->unique(['contact_id', 'tag_id']);
         });
     }
 
@@ -158,7 +158,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists(\'contact_tag\');
+        Schema::dropIfExists('contact_tag');
     }
 };
 ```
@@ -177,20 +177,20 @@ sail artisan migrate
 
 ### `..._create_tags_table.php` の解説
 
-- **`Schema::create(\'tags\', ...)`**: `tags`という名前の新しいテーブルを作成します。
-- **`$table->id();`**: `id`という名前の主キーカラム（`UNSIGNED BIGINT`, `AUTO_INCREMENT`）を作成します。これは`$table->bigIncrements(\'id\');`のショートカットです。
-- **`$table->string(\'name\', 50)->unique();`**: `name`カラムを`VARCHAR(50)`として定義し、`unique`制約を付けています。これにより、同じ名前のタグが複数登録されるのをデータベースレベルで防ぎます。`50`という長さは、タグ名として十分な長さを確保しつつ、無駄に大きな領域を確保しないためのバランスを考えた設定です。
+- **`Schema::create('tags', ...)`**: `tags`という名前の新しいテーブルを作成します。
+- **`$table->id();`**: `id`という名前の主キーカラム（`UNSIGNED BIGINT`, `AUTO_INCREMENT`）を作成します。これは`$table->bigIncrements('id');`のショートカットです。
+- **`$table->string('name', 50)->unique();`**: `name`カラムを`VARCHAR(50)`として定義し、`unique`制約を付けています。これにより、同じ名前のタグが複数登録されるのをデータベースレベルで防ぎます。`50`という長さは、タグ名として十分な長さを確保しつつ、無駄に大きな領域を確保しないためのバランスを考えた設定です。
 - **`$table->timestamps();`**: `created_at`と`updated_at`という2つの`TIMESTAMP`型のカラムを自動的に作成します。モデルを通じてデータを操作する際に、作成日時と更新日時が自動的に記録されるようになります。
 
 ### `..._create_contact_tag_table.php` の解説
 
-- **`Schema::create(\'contact_tag\', ...)`**: 中間テーブル`contact_tag`を作成します。テーブル名が規約通りなので、Laravelが賢く解釈してくれます。
-- **`$table->foreignId(\'contact_id\')->constrained()->onDelete(\'cascade\');`**: この一行は、Laravelのマイグレーションにおける非常に強力なショートカットです。これは以下の処理をまとめて行っています。
-    1.  **`foreignId(\'contact_id\')`**: `contact_id`という名前の`UNSIGNED BIGINT`型のカラムを作成します。
-    2.  **`constrained()`**: カラム名(`contact_id`)から親テーブルが`contacts`（複数形）、その主キーが`id`であると自動的に推測し、`contacts.id`への外部キー制約を設定します。もしテーブル名が規約通りでない場合は、`constrained(\'another_table\')`のように引数で指定できます。
-    3.  **`onDelete(\'cascade\')`**: 親である`contacts`テーブルのレコードが削除された場合、この`contact_tag`テーブルの関連レコードも一緒に削除するよう設定します。データの整合性を保つために非常に重要です。
-- **`$table->foreignId(\'tag_id\')->constrained()->onDelete(\'cascade\');`**: `contact_id`と同様に、`tags`テーブルへの外部キー制約とカスケード削除を設定します。
-- **`$table->unique([\'contact_id\', \'tag_id\']);`**: これは「複合ユニークキー」を設定しています。`contact_id`と`tag_id`の組み合わせが、テーブル内で常に一意であることを保証します。これにより、例えば「ID:1の問い合わせ」に「ID:5のタグ」が2回以上紐付けられる、といったデータの重複を防ぐことができます。
+- **`Schema::create('contact_tag', ...)`**: 中間テーブル`contact_tag`を作成します。テーブル名が規約通りなので、Laravelが賢く解釈してくれます。
+- **`$table->foreignId('contact_id')->constrained()->onDelete('cascade');`**: この一行は、Laravelのマイグレーションにおける非常に強力なショートカットです。これは以下の処理をまとめて行っています。
+    1.  **`foreignId('contact_id')`**: `contact_id`という名前の`UNSIGNED BIGINT`型のカラムを作成します。
+    2.  **`constrained()`**: カラム名(`contact_id`)から親テーブルが`contacts`（複数形）、その主キーが`id`であると自動的に推測し、`contacts.id`への外部キー制約を設定します。もしテーブル名が規約通りでない場合は、`constrained('another_table')`のように引数で指定できます。
+    3.  **`onDelete('cascade')`**: 親である`contacts`テーブルのレコードが削除された場合、この`contact_tag`テーブルの関連レコードも一緒に削除するよう設定します。データの整合性を保つために非常に重要です。
+- **`$table->foreignId('tag_id')->constrained()->onDelete('cascade');`**: `contact_id`と同様に、`tags`テーブルへの外部キー制約とカスケード削除を設定します。
+- **`$table->unique(['contact_id', 'tag_id']);`**: これは「複合ユニークキー」を設定しています。`contact_id`と`tag_id`の組み合わせが、テーブル内で常に一意であることを保証します。これにより、例えば「ID:1の問い合わせ」に「ID:5のタグ」が2回以上紐付けられる、といったデータの重複を防ぐことができます。
 
 ## 6. How to: この実装にたどり着くための調べ方 🗺️
 
