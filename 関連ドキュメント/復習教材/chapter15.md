@@ -187,7 +187,7 @@ class TagFactory extends Factory
 
 ## 5. 単体テスト (Unit Tests) の作成 🔬
 
-まずは、アプリケーションの最小単位である「モデル」「リクエスト」「リソース」が正しく動作するかを検証する単体テストから作成します。
+まずは、アプリケーションの最小単位である「モデル」「リクエスト」が正しく動作するかを検証する単体テストから作成します。
 
 ### 5.1 Models
 
@@ -654,139 +654,6 @@ class UpdateTagRequestTest extends TestCase
 - `$currentValidator`: 更新対象自身の名前（`current`）を指定した場合は、バリデーションを通過することをテストします。
 - `$duplicateValidator`: 別の既存タグの名前（`existing`）を指定した場合は、バリデーションに失敗することをテストします。
 
-### 5.3 Resources
-
-APIリソースのテストでは、モデルが意図した通りのJSON構造に変換されるかを確認します。
-
-#### 5.3.1 CategoryResourceのテスト
-
-```bash
-php artisan make:test Resources/CategoryResourceTest --unit
-```
-
-作成された`tests/Unit/Resources/CategoryResourceTest.php`を以下のように編集します。
-
-**tests/Unit/Resources/CategoryResourceTest.php**
-```php
-<?php
-
-namespace Tests\Unit\Resources;
-
-use App\Http\Resources\CategoryResource;
-use App\Models\Category;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Request;
-use Tests\TestCase;
-
-class CategoryResourceTest extends TestCase
-{
-    use RefreshDatabase;
-
-    public function test_category_resource_structure(): void
-    {
-        $category = Category::factory()->create(["content" => "Delivery Issues"]);
-
-        $resource = (new CategoryResource($category))->toArray(new Request());
-
-        $this->assertSame($category->id, $resource["id"]);
-        $this->assertSame("Delivery Issues", $resource["content"]);
-    }
-}
-```
-
-#### コード解説
-- `$resource = (new CategoryResource($category))->toArray(new Request());`: `CategoryResource`のインスタンスを作成し、`toArray()`メソッドを呼び出して、変換後の配列を取得します。
-- `$this->assertSame($category->id, $resource["id"]);`: 変換後の配列に、期待される`id`と`content`が含まれていることを`assertSame`で厳密に比較・アサートします。
-
-#### 5.3.2 ContactResourceのテスト
-
-```bash
-php artisan make:test Resources/ContactResourceTest --unit
-```
-
-作成された`tests/Unit/Resources/ContactResourceTest.php`を以下のように編集します。
-
-**tests/Unit/Resources/ContactResourceTest.php**
-```php
-<?php
-
-namespace Tests\Unit\Resources;
-
-use App\Http\Resources\ContactResource;
-use App\Models\Category;
-use App\Models\Contact;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Request;
-use Tests\TestCase;
-
-class ContactResourceTest extends TestCase
-{
-    use RefreshDatabase;
-
-    public function test_contact_resource_contains_expected_fields(): void
-    {
-        $category = Category::factory()->create(["content" => "Support"]);
-        $contact = Contact::factory()->for($category)->create([
-            "first_name" => "Saya",
-            "last_name" => "Tanaka",
-            "building" => "Blue Tower",
-        ]);
-        $contact->setRelation("category", $category);
-
-        $resource = (new ContactResource($contact))->toArray(new Request());
-
-        $this->assertSame($contact->id, $resource["id"]);
-        $this->assertSame("Saya", $resource["first_name"]);
-        $this->assertSame("Tanaka", $resource["last_name"]);
-        $this->assertSame("Blue Tower", $resource["building"]);
-        $this->assertSame("Support", $resource["category"]["content"]);
-    }
-}
-```
-
-#### コード解説
-- `$contact->setRelation("category", $category);`: `ContactResource`は`category`リレーションを読み込むため、テストで明示的にリレーションをセットしています。
-- `$this->assertSame("Support", $resource["category"]["content"]);`: ネストされたリソース（`category`）の内容も正しく変換されていることを確認します。
-
-#### 5.3.3 TagResourceのテスト
-
-```bash
-php artisan make:test Resources/TagResourceTest --unit
-```
-
-作成された`tests/Unit/Resources/TagResourceTest.php`を以下のように編集します。
-
-**tests/Unit/Resources/TagResourceTest.php**
-```php
-<?php
-
-namespace Tests\Unit\Resources;
-
-use App\Http\Resources\TagResource;
-use App\Models\Tag;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Request;
-use Tests\TestCase;
-
-class TagResourceTest extends TestCase
-{
-    use RefreshDatabase;
-
-    public function test_tag_resource_structure(): void
-    {
-        $tag = Tag::factory()->create(["name" => "important"]);
-
-        $resource = (new TagResource($tag))->toArray(new Request());
-
-        $this->assertSame($tag->id, $resource["id"]);
-        $this->assertSame("important", $resource["name"]);
-    }
-}
-```
-
-#### コード解説
-- `CategoryResource`のテストと同様に、`Tag`モデルが期待通りのJSON構造に変換されることを確認しています。
-
 ## 6. 機能テスト (Feature Tests) の作成 🚀
 
 いよいよ、ユーザーの操作を模した機能テストを実装していきます。ここでは、実際にHTTPリクエストを送信し、返ってきたレスポンスやデータベースの状態を検証します。
@@ -807,6 +674,8 @@ php artisan make:test ContactPageTest
 
 namespace Tests\Feature;
 
+use App\Models\Category;
+use App\Models\Tag;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -820,6 +689,20 @@ class ContactPageTest extends TestCase
 
         $response->assertOk();
         $response->assertViewIs("contact.index");
+        $response->assertViewHas("categories");
+        $response->assertViewHas("tags");
+    }
+
+    public function test_contact_index_page_displays_categories_and_tags(): void
+    {
+        $category = Category::factory()->create(["content" => "Delivery"]);
+        $tag = Tag::factory()->create(["name" => "urgent"]);
+
+        $response = $this->get("/");
+
+        $response->assertOk();
+        $response->assertSee("Delivery");
+        $response->assertSee("urgent");
     }
 
     public function test_contact_thanks_page_is_accessible(): void
@@ -836,47 +719,12 @@ class ContactPageTest extends TestCase
 - `$this->get("/")`: アプリケーションのルートURL（`/`）に対してGETリクエストを送信します。
 - `$response->assertOk()`: レスポンスのHTTPステータスコードが200 OKであることをアサートします。
 - `$response->assertViewIs("contact.index")`: レスポンスとして`contact.index`ビューが返されたことをアサートします。
+- `$response->assertViewHas("categories")`: ビューに`categories`という変数が渡されていることをアサートします。コントローラーからビューへのデータの受け渡しが正しく行われているかを確認できます。
+- `$response->assertViewHas("tags")`: 同様に、`tags`変数がビューに渡されていることをアサートします。
+- `test_contact_index_page_displays_categories_and_tags()`: 実際にカテゴリとタグを作成し、ページのHTMLにそれらの名前が含まれていることを`assertSee`で確認します。これにより、データがビューに渡されるだけでなく、実際に画面に表示されることを保証します。
 - `test_contact_thanks_page_is_accessible()`: サンクスページ(`/thanks`)が正常に表示されることをテストします。
 
-#### 6.1.2 管理画面コントローラーのテスト
-
-```bash
-php artisan make:test AdminControllerTest
-```
-
-作成された`tests/Feature/AdminControllerTest.php`を以下のように編集します。
-
-**tests/Feature/AdminControllerTest.php**
-```php
-<?php
-
-namespace Tests\Feature;
-
-use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
-
-class AdminControllerTest extends TestCase
-{
-    use RefreshDatabase;
-
-    public function test_authenticated_user_can_view_admin_dashboard(): void
-    {
-        $user = User::factory()->create();
-
-        $response = $this->actingAs($user)->get("/admin");
-
-        $response->assertOk();
-        $response->assertViewIs("admin.index");
-    }
-}
-```
-
-#### コード解説
-- `actingAs($user)`: 指定したユーザーとしてログインした状態でリクエストを送信します。
-- `test_authenticated_user_can_view_admin_dashboard()`: 認証済みのユーザーが`/admin`にアクセスし、`admin.index`ビューが返されることをテストしています。
-
-#### 6.1.3 CSVエクスポート機能のテスト
+#### 6.1.2 CSVエクスポート機能のテスト
 
 ```bash
 php artisan make:test ContactExportTest
@@ -960,10 +808,10 @@ class ContactExportTest extends TestCase
         $this->assertStringContainsString("Brown Mark", $content);
 
         $lines = array_values(array_filter(explode("\n", trim($content))));
-        $firstLine = ltrim($lines[0] ?? ", "\xEF\xBB\xBF");
+        $firstLine = ltrim($lines[0] ?? "", "\xEF\xBB\xBF");
 
         $this->assertStringContainsString("Brown Mark", $firstLine);
-        $this->assertStringContainsString("Adams Eve", $lines[1] ?? ");
+        $this->assertStringContainsString("Adams Eve", $lines[1] ?? "");
     }
 }
 ```
@@ -976,72 +824,29 @@ class ContactExportTest extends TestCase
 - `$this->assertStringNotContainsString(...)`: CSVの内容に、条件に一致しないデータが含まれていないことを確認します。
 - `test_export_without_filters_returns_all_contacts_in_latest_order()`: フィルタを指定しない場合に、全てのデータが最新順でエクスポートされるかをテストします。
 - `explode("\n", trim($content))`: CSVの内容を改行で分割し、各行を配列として取得します。
-- `ltrim($lines[0] ?? ", "\xEF\xBB\xBF")`: 1行目の先頭にある可能性のあるBOM（バイトオーダーマーク）を除去します。
+- `ltrim($lines[0] ?? "", "\xEF\xBB\xBF")`: 1行目の先頭にある可能性のあるBOM（バイトオーダーマーク）を除去します。
 - 1行目に最新のデータ（`Brown Mark`）が、2行目に古いデータ（`Adams Eve`）が含まれていることを確認し、ソート順を検証します。
 
-### 6.2 APIエンドポイント
+### 6.2 Webルートの機能テスト
 
-#### 6.2.1 カテゴリAPIのテスト
+このセクションでは、Webルートを通じたコントローラーの動作を検証します。お問い合わせフォームの確認画面・保存処理、管理画面のCRUD操作、タグ管理など、ユーザーが実際に行う操作を再現してテストします。
+
+#### 6.2.1 お問い合わせコントローラーのテスト
 
 ```bash
-php artisan make:test Api/CategoryControllerTest
+php artisan make:test ContactControllerTest
 ```
 
-作成された`tests/Feature/Api/CategoryControllerTest.php`を以下のように編集します。
+作成された`tests/Feature/ContactControllerTest.php`を以下のように編集します。
 
-**tests/Feature/Api/CategoryControllerTest.php**
+**tests/Feature/ContactControllerTest.php**
 ```php
 <?php
 
-namespace Tests\Feature\Api;
+namespace Tests\Feature;
 
 use App\Models\Category;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
-
-class CategoryControllerTest extends TestCase
-{
-    use RefreshDatabase;
-
-    public function test_index_returns_all_categories(): void
-    {
-        $categories = Category::factory()->count(3)->create();
-
-        $response = $this->getJson("/api/categories");
-
-        $response->assertOk();
-        $response->assertJsonCount(3, "data");
-        $response->assertJsonFragment([
-            "id" => $categories->first()->id,
-            "content" => $categories->first()->content,
-        ]);
-    }
-}
-```
-
-#### コード解説
-- `$this->getJson("/api/categories")`: 指定したAPIエンドポイントにGETリクエストを送信し、JSON形式のレスポンスを期待します。
-- `$response->assertJsonCount(3, "data");`: レスポンスJSONの`data`キー配下の要素が3つであることをアサートします。
-- `$response->assertJsonFragment([...])`: レスポンスJSONの中に、指定したキーと値のペアを持つ断片が含まれていることをアサートします。
-
-#### 6.2.2 お問い合わせAPIのテスト
-
-```bash
-php artisan make:test Api/ContactControllerTest
-```
-
-作成された`tests/Feature/Api/ContactControllerTest.php`を以下のように編集します。
-
-**tests/Feature/Api/ContactControllerTest.php**
-```php
-<?php
-
-namespace Tests\Feature\Api;
-
-use App\Models\Category;
-use App\Models\Contact;
 use App\Models\Tag;
-use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -1049,96 +854,186 @@ class ContactControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_index_applies_all_available_filters(): void
+    private function validPayload(Category $category, array $overrides = []): array
     {
-        $category = Category::factory()->create(["content" => "Delivery"]);
-        $otherCategory = Category::factory()->create(["content" => "Other"]);
-
-        $matching = Contact::factory()->for($category)->create([
-            "first_name" => "Ken",
-            "last_name" => "Ito",
-            "gender" => 1,
-            "email" => "ken@example.com",
-            "created_at" => Carbon::parse("2024-02-01 09:00:00"),
-        ]);
-
-        Contact::factory()->for($otherCategory)->create([
-            "first_name" => "Jane",
-            "last_name" => "Smith",
-            "gender" => 2,
-            "email" => "jane@example.com",
-            "created_at" => Carbon::parse("2024-02-02 09:00:00"),
-        ]);
-
-        $tag = Tag::factory()->create();
-        $matching->tags()->attach($tag);
-
-        $response = $this->getJson("/api/contacts?keyword=Ken&gender=1&category_id=" . $category->id . "&date=2024-02-01");
-
-        $response->assertOk();
-        $response->assertJsonCount(1, "data");
-        $response->assertJsonPath("data.0.id", $matching->id);
-        $response->assertJsonPath("data.0.category.id", $category->id);
-        $response->assertJsonPath("meta.total", 1);
+        return array_merge([
+            'first_name' => 'Taro',
+            'last_name' => 'Yamada',
+            'gender' => 1,
+            'email' => 'taro@example.com',
+            'tel' => '0312345678',
+            'address' => 'Tokyo',
+            'building' => 'Sunshine 60',
+            'category_id' => $category->id,
+            'detail' => 'お問い合わせ内容です',
+        ], $overrides);
     }
 
-    public function test_store_persists_contact_and_attaches_tags(): void
+    public function test_confirm_displays_validated_data(): void
     {
         $category = Category::factory()->create();
         $tags = Tag::factory()->count(2)->create();
 
-        $payload = [
-            "first_name" => "Taro",
-            "last_name" => "Yamada",
-            "gender" => 1,
-            "email" => "taro@example.com",
-            "tel" => "0312345678",
-            "address" => "Tokyo",
-            "building" => "Sunshine 60",
-            "category_id" => $category->id,
-            "detail" => "お問い合わせ内容です",
-            "tag_ids" => $tags->pluck("id")->toArray(),
-        ];
-
-        $response = $this->postJson("/api/contacts", $payload);
-
-        $response->assertCreated();
-        $this->assertDatabaseHas("contacts", [
-            "email" => "taro@example.com",
-            "category_id" => $category->id,
+        $payload = $this->validPayload($category, [
+            'tag_ids' => $tags->pluck('id')->toArray(),
         ]);
 
-        $contact = Contact::where("email", "taro@example.com")->first();
-        foreach ($tags as $tag) {
-            $this->assertDatabaseHas("contact_tag", [
-                "contact_id" => $contact->id,
-                "tag_id" => $tag->id,
-            ]);
-        }
+        $response = $this->post('/contacts/confirm', $payload);
+
+        $response->assertOk();
+        $response->assertViewIs('contact.confirm');
     }
 
-    public function test_show_returns_single_contact(): void
+    public function test_confirm_validation_error_redirects_back(): void
     {
-        $category = Category::factory()->create(["content" => "Support"]);
-        $contact = Contact::factory()->for($category)->create([
+        $response = $this->post('/contacts/confirm', []);
+
+        $response->assertRedirect();
+        $response->assertSessionHasErrors();
+    }
+
+    public function test_store_persists_contact_and_redirects_to_thanks(): void
+    {
+        $category = Category::factory()->create();
+        $tags = Tag::factory()->count(2)->create();
+
+        $payload = $this->validPayload($category, [
+            'tag_ids' => $tags->pluck('id')->toArray(),
+        ]);
+
+        $response = $this->post('/contacts', $payload);
+
+        $response->assertRedirect('/thanks');
+        $this->assertDatabaseHas('contacts', [
+            'email' => 'taro@example.com',
+            'category_id' => $category->id,
+        ]);
+    }
+
+    public function test_store_validation_error_redirects_back(): void
+    {
+        $response = $this->post('/contacts', []);
+
+        $response->assertRedirect();
+        $response->assertSessionHasErrors();
+    }
+}
+```
+
+#### コード解説
+- `validPayload()`: テストで使用する有効なフォームデータを生成するヘルパーメソッドです。`$overrides`で一部のデータを上書きできます。
+- `test_confirm_displays_validated_data()`: 確認画面へのPOSTリクエストが成功し、`contact.confirm`ビューが表示されることをテストします。
+  - `$this->post('/contacts/confirm', $payload)`: 確認画面のURLにPOSTリクエストを送信します。
+  - `$response->assertViewIs('contact.confirm')`: 確認画面のビューが返されたことを確認します。
+- `test_confirm_validation_error_redirects_back()`: 空のデータで確認画面にPOSTした場合、バリデーションエラーで元の画面にリダイレクトされることをテストします。
+  - `$response->assertSessionHasErrors()`: セッションにバリデーションエラーが存在することをアサートします。
+- `test_store_persists_contact_and_redirects_to_thanks()`: お問い合わせデータの保存が成功し、サンクスページにリダイレクトされることをテストします。
+  - `$this->post('/contacts', $payload)`: お問い合わせ保存のURLにPOSTリクエストを送信します。
+  - `$response->assertRedirect('/thanks')`: サンクスページへリダイレクトされることを確認します。
+  - `$this->assertDatabaseHas('contacts', ...)`: データベースにお問い合わせデータが保存されたことを確認します。
+- `test_store_validation_error_redirects_back()`: 空のデータで保存を試みた場合、バリデーションエラーでリダイレクトされることをテストします。
+
+#### 6.2.2 管理画面コントローラーのテスト
+
+```bash
+php artisan make:test AdminControllerTest
+```
+
+作成された`tests/Feature/AdminControllerTest.php`を以下のように編集します。
+
+**tests/Feature/AdminControllerTest.php**
+```php
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Category;
+use App\Models\Contact;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class AdminControllerTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_authenticated_user_can_view_admin_dashboard(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get("/admin");
+
+        $response->assertOk();
+        $response->assertViewIs("admin.index");
+        $response->assertViewHas("contacts");
+    }
+
+    public function test_unauthenticated_user_is_redirected_to_login(): void
+    {
+        $response = $this->get("/admin");
+
+        $response->assertRedirect("/login");
+    }
+
+    public function test_index_displays_contacts_with_filter(): void
+    {
+        $user = User::factory()->create();
+        $category = Category::factory()->create(["content" => "Delivery"]);
+
+        Contact::factory()->for($category)->create([
+            "first_name" => "Ken",
+            "last_name" => "Ito",
+            "gender" => 1,
+            "email" => "ken@example.com",
+        ]);
+
+        Contact::factory()->create([
+            "first_name" => "Jane",
+            "last_name" => "Smith",
+            "gender" => 2,
+            "email" => "jane@example.com",
+        ]);
+
+        $response = $this->actingAs($user)->get("/admin?keyword=Ken");
+
+        $response->assertOk();
+        $response->assertSee("Ken");
+    }
+
+    public function test_index_paginates_results(): void
+    {
+        $user = User::factory()->create();
+        Contact::factory()->count(20)->create();
+
+        $response = $this->actingAs($user)->get("/admin");
+
+        $response->assertOk();
+        $response->assertViewHas("contacts");
+    }
+
+    public function test_show_displays_contact_detail(): void
+    {
+        $user = User::factory()->create();
+        $contact = Contact::factory()->create([
             "first_name" => "Mika",
             "last_name" => "Suzuki",
         ]);
 
-        $response = $this->getJson("/api/contacts/" . $contact->id);
+        $response = $this->actingAs($user)->get("/admin/" . $contact->id);
 
         $response->assertOk();
-        $response->assertJsonPath("data.id", $contact->id);
-        $response->assertJsonPath("data.category.id", $category->id);
+        $response->assertSee("Mika");
+        $response->assertSee("Suzuki");
     }
 
-    public function test_destroy_removes_contact(): void
+    public function test_destroy_removes_contact_and_redirects(): void
     {
+        $user = User::factory()->create();
         $contact = Contact::factory()->create();
 
-        $response = $this->deleteJson("/api/contacts/" . $contact->id);
+        $response = $this->actingAs($user)->delete("/admin/" . $contact->id);
 
-        $response->assertNoContent();
+        $response->assertRedirect("/admin");
         $this->assertDatabaseMissing("contacts", [
             "id" => $contact->id,
         ]);
@@ -1147,31 +1042,36 @@ class ContactControllerTest extends TestCase
 ```
 
 #### コード解説
-- `test_index_applies_all_available_filters()`: `index`アクションが、全ての検索フィルタ（キーワード、性別、カテゴリ、日付）を正しく適用して結果を返すことをテストします。
-- `$response->assertJsonPath("data.0.id", $matching->id)`: JSONレスポンスの特定のパス（`data`配列の0番目の要素の`id`）が、期待した値（`$matching->id`）であることをアサートします。
-- `test_store_persists_contact_and_attaches_tags()`: `store`アクションが、お問い合わせデータを作成し、関連するタグを中間テーブルに正しく保存することをテストします。
-- `$this->assertDatabaseHas("contacts", ...)`: `contacts`テーブルに指定したデータが存在することを確認します。
-- `foreach ($tags as $tag) { ... }`: ループを使って、全てのタグが正しく紐付けられたかを`contact_tag`テーブルで確認します。
-- `test_show_returns_single_contact()`: `show`アクションが、指定したIDのお問い合わせデータを正しく返すことをテストします。
-- `test_destroy_removes_contact()`: `destroy`アクションが、指定したIDのお問い合わせデータをデータベースから削除することをテストします。
-- `$response->assertNoContent()`: レスポンスのステータスコードが204 No Contentであることをアサートします。
-- `$this->assertDatabaseMissing("contacts", ...)`: `contacts`テーブルから指定したデータが削除されたことを確認します。
+- `test_authenticated_user_can_view_admin_dashboard()`: 認証済みのユーザーが`/admin`にアクセスし、`admin.index`ビューが返されることをテストしています。
+  - `$this->actingAs($user)->get("/admin")`: `actingAs()`で指定したユーザーとしてログインした状態でリクエストを送信します。
+  - `$response->assertViewHas("contacts")`: ビューに`contacts`変数が渡されていることを確認します。コントローラーがお問い合わせデータを正しくビューに渡しているかを検証します。
+- `test_unauthenticated_user_is_redirected_to_login()`: 未認証のユーザーが`/admin`にアクセスした場合、ログインページにリダイレクトされることをテストします。
+  - `$response->assertRedirect("/login")`: `/login`へのリダイレクトが発生したことをアサートします。認証ミドルウェアが正しく機能していることを確認できます。
+- `test_index_displays_contacts_with_filter()`: キーワードフィルタを指定して管理画面にアクセスし、検索結果が正しく表示されることをテストします。
+  - `$response->assertSee("Ken")`: レスポンスのHTML内に指定した文字列が含まれていることをアサートします。
+- `test_index_paginates_results()`: 大量のデータが存在する場合にページネーションが正しく動作することをテストします。
+- `test_show_displays_contact_detail()`: 個別のお問い合わせ詳細画面が正しく表示されることをテストします。
+- `test_destroy_removes_contact_and_redirects()`: お問い合わせの削除が成功し、管理画面にリダイレクトされることをテストします。
+  - `$this->actingAs($user)->delete("/admin/" . $contact->id)`: DELETEリクエストを送信してお問い合わせを削除します。
+  - `$response->assertRedirect("/admin")`: 削除後に管理画面にリダイレクトされることを確認します。
+  - `$this->assertDatabaseMissing("contacts", ...)`: データベースからお問い合わせデータが正しく削除されたことを確認します。
 
-#### 6.2.3 タグAPIのテスト
+#### 6.2.3 タグコントローラーのテスト
 
 ```bash
-php artisan make:test Api/TagControllerTest
+php artisan make:test TagControllerTest
 ```
 
-作成された`tests/Feature/Api/TagControllerTest.php`を以下のように編集します。
+作成された`tests/Feature/TagControllerTest.php`を以下のように編集します。
 
-**tests/Feature/Api/TagControllerTest.php**
+**tests/Feature/TagControllerTest.php**
 ```php
 <?php
 
-namespace Tests\Feature\Api;
+namespace Tests\Feature;
 
 use App\Models\Tag;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -1179,56 +1079,75 @@ class TagControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_index_returns_all_tags(): void
+    public function test_authenticated_user_can_create_tag(): void
     {
-        $tags = Tag::factory()->count(2)->create();
+        $user = User::factory()->create();
 
-        $response = $this->getJson("/api/tags");
+        $response = $this->actingAs($user)->post("/tags", ["name" => "priority"]);
 
-        $response->assertOk();
-        $response->assertJsonCount(2, "data");
-        $response->assertJsonFragment([
-            "id" => $tags->first()->id,
-            "name" => $tags->first()->name,
-        ]);
-    }
-
-    public function test_store_creates_tag(): void
-    {
-        $response = $this->postJson("/api/tags", ["name" => "priority"]);
-
-        $response->assertCreated();
+        $response->assertRedirect();
         $this->assertDatabaseHas("tags", ["name" => "priority"]);
     }
 
-    public function test_update_modifies_tag_name(): void
+    public function test_authenticated_user_can_update_tag(): void
     {
+        $user = User::factory()->create();
         $tag = Tag::factory()->create(["name" => "initial"]);
 
-        $response = $this->putJson("/api/tags/" . $tag->id, ["name" => "updated"]);
+        $response = $this->actingAs($user)->put("/tags/" . $tag->id, ["name" => "updated"]);
 
-        $response->assertNoContent();
+        $response->assertRedirect();
         $this->assertDatabaseHas("tags", ["id" => $tag->id, "name" => "updated"]);
     }
 
-    public function test_destroy_deletes_tag(): void
+    public function test_authenticated_user_can_delete_tag(): void
     {
+        $user = User::factory()->create();
         $tag = Tag::factory()->create();
 
-        $response = $this->deleteJson("/api/tags/" . $tag->id);
+        $response = $this->actingAs($user)->delete("/tags/" . $tag->id);
 
-        $response->assertNoContent();
+        $response->assertRedirect();
         $this->assertDatabaseMissing("tags", ["id" => $tag->id]);
+    }
+
+    public function test_unauthenticated_user_cannot_create_tag(): void
+    {
+        $response = $this->post("/tags", ["name" => "unauthorized"]);
+
+        $response->assertRedirect("/login");
+        $this->assertDatabaseMissing("tags", ["name" => "unauthorized"]);
     }
 }
 ```
 
 #### コード解説
-- `test_store_creates_tag()`: `store`アクションが、新しいタグをデータベースに保存することをテストします。
-- `$response->assertCreated()`: レスポンスのステータスコードが201 Createdであることをアサートします。
-- `test_update_modifies_tag_name()`: `update`アクションが、指定したタグの名前を更新することをテストします。
-- `$this->putJson(...)`: PUTリクエストを送信します。
-- `test_destroy_deletes_tag()`: `destroy`アクションが、指定したタグをデータベースから削除することをテストします。
+- `test_authenticated_user_can_create_tag()`: 認証済みのユーザーがタグを作成できることをテストします。
+  - `$this->actingAs($user)->post("/tags", ["name" => "priority"])`: ログイン状態でPOSTリクエストを送信し、タグを作成します。
+  - `$this->assertDatabaseHas("tags", ["name" => "priority"])`: データベースに新しいタグが保存されたことを確認します。
+- `test_authenticated_user_can_update_tag()`: 認証済みのユーザーがタグ名を更新できることをテストします。
+  - `$this->actingAs($user)->put("/tags/" . $tag->id, ["name" => "updated"])`: PUTリクエストでタグを更新します。
+  - `$this->assertDatabaseHas("tags", ["id" => $tag->id, "name" => "updated"])`: データベースのタグ名が正しく更新されたことを確認します。
+- `test_authenticated_user_can_delete_tag()`: 認証済みのユーザーがタグを削除できることをテストします。
+  - `$this->actingAs($user)->delete("/tags/" . $tag->id)`: DELETEリクエストでタグを削除します。
+  - `$this->assertDatabaseMissing("tags", ["id" => $tag->id])`: データベースからタグが削除されたことを確認します。
+- `test_unauthenticated_user_cannot_create_tag()`: 未認証のユーザーがタグを作成しようとした場合、ログインページにリダイレクトされ、タグは作成されないことをテストします。
+  - `$response->assertRedirect("/login")`: 認証ミドルウェアによりログインページにリダイレクトされることを確認します。
+  - `$this->assertDatabaseMissing("tags", ["name" => "unauthorized"])`: 未認証のリクエストではタグが保存されないことを保証します。
+
+> **💡 SSRアプリケーションにおけるテストのポイント**
+>
+> 従来のLaravel SSR（サーバーサイドレンダリング）アプリケーションでは、APIとは異なるテストパターンが重要になります。
+>
+> | パターン | 使い方 | 検証内容 |
+> |---|---|---|
+> | `$this->post('/contacts/confirm', $payload)` | フォーム送信のシミュレート | `assertOk()` + `assertViewIs()` で確認画面の表示を検証 |
+> | `$this->post('/contacts', $payload)` | データ保存のシミュレート | `assertRedirect('/thanks')` でリダイレクト先を検証 |
+> | `$this->actingAs($user)->get('/admin')` | 認証付きページアクセス | `assertViewHas('contacts')` でビューへのデータ受け渡しを検証 |
+> | `$this->actingAs($user)->delete(...)` | 認証付き削除操作 | `assertRedirect('/admin')` + `assertDatabaseMissing()` で削除とリダイレクトを検証 |
+> | `$this->get('/admin')` (未認証) | 認証ガードの検証 | `assertRedirect('/login')` で未認証時のリダイレクトを検証 |
+>
+> APIテスト（`getJson`, `postJson`, `assertCreated`, `assertNoContent`等）とは異なり、SSRテストでは **ビューの表示** (`assertViewIs`, `assertViewHas`, `assertSee`) と **リダイレクト** (`assertRedirect`) が主要なアサーションとなります。
 
 ## 7. テストの実行 🏁
 
@@ -1273,32 +1192,19 @@ php artisan test
    PASS  Tests\Unit\Requests\UpdateTagRequestTest
    ✓ rules allow current name but reject duplicates
 
-   PASS  Tests\Unit\Resources\CategoryResourceTest
-   ✓ category resource structure
-
-   PASS  Tests\Unit\Resources\ContactResourceTest
-   ✓ contact resource contains expected fields
-
-   PASS  Tests\Unit\Resources\TagResourceTest
-   ✓ tag resource structure
-
    PASS  Tests\Feature\AdminControllerTest
    ✓ authenticated user can view admin dashboard
+   ✓ unauthenticated user is redirected to login
+   ✓ index displays contacts with filter
+   ✓ index paginates results
+   ✓ show displays contact detail
+   ✓ destroy removes contact and redirects
 
-   PASS  Tests\Feature\Api\CategoryControllerTest
-   ✓ index returns all categories
-
-   PASS  Tests\Feature\Api\ContactControllerTest
-   ✓ index applies all available filters
-   ✓ store persists contact and attaches tags
-   ✓ show returns single contact
-   ✓ destroy removes contact
-
-   PASS  Tests\Feature\Api\TagControllerTest
-   ✓ index returns all tags
-   ✓ store creates tag
-   ✓ update modifies tag name
-   ✓ destroy deletes tag
+   PASS  Tests\Feature\ContactControllerTest
+   ✓ confirm displays validated data
+   ✓ confirm validation error redirects back
+   ✓ store persists contact and redirects to thanks
+   ✓ store validation error redirects back
 
    PASS  Tests\Feature\ContactExportTest
    ✓ authenticated user can export filtered contacts
@@ -1306,9 +1212,16 @@ php artisan test
 
    PASS  Tests\Feature\ContactPageTest
    ✓ contact index page is accessible
+   ✓ contact index page displays categories and tags
    ✓ contact thanks page is accessible
 
-  Tests:  28 passed
+   PASS  Tests\Feature\TagControllerTest
+   ✓ authenticated user can create tag
+   ✓ authenticated user can update tag
+   ✓ authenticated user can delete tag
+   ✓ unauthenticated user cannot create tag
+
+  Tests:  31 passed
   Time:   1.50s
 ```
 
@@ -1319,7 +1232,7 @@ php artisan test
 お疲れ様でした！このチャプターでは、Laravelの自動テスト機能を網羅的に学び、アプリケーションの品質をコードで保証する方法を習得しました。
 
 - **Factory**でテストデータを効率的に生成し、
-- **単体テスト**でモデル、リクエスト、リソースといった個々の部品の動作を保証し、
+- **単体テスト**でモデル、リクエストといった個々の部品の動作を保証し、
 - **機能テスト**でユーザーの操作に基づいた一連の機能が正しく連携して動作することを証明しました。
 
 自動テストは、一度書けば何度でも同じ検証を瞬時に実行してくれます。これにより、機能追加やリファクタリングを行った際に、意図せず既存の機能を壊してしまう「デグレード」を恐れることなく、自信を持って開発を進めることができます。

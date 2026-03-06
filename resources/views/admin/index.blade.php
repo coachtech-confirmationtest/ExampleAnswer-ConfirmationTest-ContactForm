@@ -14,29 +14,34 @@
 
             <!-- 検索フォーム -->
             <div class="mb-4">
-                <form class="flex flex-wrap items-center gap-3" action="/admin/search" method="get">
+                <form class="flex flex-wrap items-center gap-3" action="/admin" method="get">
                     <div class="flex-1 min-w-[200px]">
-                        <input id="keyword-input" type="text" name="keyword" value="{{ $request->keyword ?? '' }}"
+                        <input type="text" name="keyword" value="{{ request('keyword') }}"
                             placeholder="名前やメールアドレスを入力してください"
                             class="w-full px-4 py-2 bg-white border border-[#ddd8d3] rounded text-gray-700 placeholder-[#c4bab0] focus:outline-none focus:border-amber-500" />
                     </div>
                     <div class="min-w-[100px]">
-                        <select id="gender-select" name="gender"
+                        <select name="gender"
                             class="w-full px-4 py-2 bg-white border border-[#ddd8d3] rounded text-[#9a938c] focus:outline-none focus:border-amber-500">
-                            <option value="0">性別</option>
-                            <option value="1">男性</option>
-                            <option value="2">女性</option>
-                            <option value="3">その他</option>
+                            <option value="0" {{ request('gender') == '0' || !request('gender') ? 'selected' : '' }}>性別</option>
+                            <option value="1" {{ request('gender') == '1' ? 'selected' : '' }}>男性</option>
+                            <option value="2" {{ request('gender') == '2' ? 'selected' : '' }}>女性</option>
+                            <option value="3" {{ request('gender') == '3' ? 'selected' : '' }}>その他</option>
                         </select>
                     </div>
                     <div class="min-w-[160px]">
-                        <select id="category-select" name="category_id"
+                        <select name="category_id"
                             class="w-full px-4 py-2 bg-white border border-[#ddd8d3] rounded text-[#9a938c] focus:outline-none focus:border-amber-500">
-                            <option value="" disabled>お問い合わせの種類</option>
+                            <option value="">お問い合わせの種類</option>
+                            @foreach ($categories as $category)
+                                <option value="{{ $category->id }}" {{ request('category_id') == $category->id ? 'selected' : '' }}>
+                                    {{ $category->content }}
+                                </option>
+                            @endforeach
                         </select>
                     </div>
                     <div class="min-w-[130px]">
-                        <input id="date-input" type="date" name="date" value="{{ $request->date ?? '' }}"
+                        <input type="date" name="date" value="{{ request('date') }}"
                             placeholder="年/月/日"
                             class="w-full px-4 py-2 bg-white border border-[#ddd8d3] rounded text-[#9a938c] focus:outline-none focus:border-amber-500" />
                     </div>
@@ -52,17 +57,17 @@
                         </a>
                     </div>
                     <div>
-                        <button id="export-btn" type="button"
-                            class="px-6 py-2 bg-amber-600 text-white rounded hover:bg-amber-700">
+                        <a href="/contacts/export?{{ http_build_query(request()->query()) }}"
+                            class="px-6 py-2 bg-amber-600 text-white rounded hover:bg-amber-700 inline-block">
                             エクスポート
-                        </button>
+                        </a>
                     </div>
                 </form>
             </div>
 
             <!-- ページネーション -->
             <div class="mb-4 flex justify-end items-center">
-                <div id="pagination-container" class="flex items-center gap-1"></div>
+                {{ $contacts->appends(request()->query())->links() }}
             </div>
 
             <!-- テーブル -->
@@ -78,10 +83,33 @@
                             <th class="px-6 py-3 text-left text-sm font-medium text-white"></th>
                         </tr>
                     </thead>
-                    <tbody id="contacts-tbody" class="divide-y divide-gray-200">
-                        <tr>
-                            <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">読み込み中...</td>
-                        </tr>
+                    <tbody class="divide-y divide-gray-200">
+                        @forelse ($contacts as $contact)
+                            <tr>
+                                <td class="px-6 py-4 text-sm text-gray-700">{{ $contact->last_name }} {{ $contact->first_name }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-700">
+                                    @php
+                                        $genderLabels = [1 => '男性', 2 => '女性', 3 => 'その他'];
+                                    @endphp
+                                    {{ $genderLabels[$contact->gender] ?? '' }}
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-700">{{ $contact->email }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-700">{{ $contact->category->content ?? '' }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-700">
+                                    @foreach ($contact->tags as $tag)
+                                        <span class="inline-block bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded mr-1">{{ $tag->name }}</span>
+                                    @endforeach
+                                </td>
+                                <td class="px-6 py-4 text-sm">
+                                    <a href="/admin/contacts/{{ $contact->id }}"
+                                        class="text-amber-600 hover:text-amber-800">詳細</a>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">データがありません</td>
+                            </tr>
+                        @endforelse
                     </tbody>
                 </table>
             </div>
@@ -93,19 +121,19 @@
                     <p class="text-sm text-gray-500">問い合わせフォームで選択できるタグを追加・編集できます</p>
                 </div>
 
-                <form id="tag-form" class="bg-[#f9f6f2] rounded px-4 py-4">
+                <!-- タグ追加フォーム -->
+                <form action="/admin/tags" method="post" class="bg-[#f9f6f2] rounded px-4 py-4">
+                    @csrf
                     <label class="block text-sm text-[#6b5744] mb-2" for="tag-name-input">タグ名</label>
                     <input type="text" id="tag-name-input" name="name" placeholder="例: 新機能の要望"
                         class="w-full px-4 py-2 bg-white border border-[#ddd8d3] rounded text-gray-700 placeholder-[#c4bab0] focus:outline-none focus:border-amber-500" />
-                    <div id="tag-form-error" class="mt-2 text-sm text-red-600"></div>
+                    @error('name')
+                        <div class="mt-2 text-sm text-red-600">{{ $message }}</div>
+                    @enderror
                     <div class="flex items-center gap-3 mt-4">
-                        <button type="submit" id="tag-submit-btn"
+                        <button type="submit"
                             class="px-6 py-2 bg-[#7d7470] text-white rounded hover:bg-[#6b5f57]">
                             追加
-                        </button>
-                        <button type="button" id="tag-cancel-btn"
-                            class="px-4 py-2 text-[#7d7470] border border-[#ddd8d3] rounded hover:bg-gray-50 hidden">
-                            キャンセル
                         </button>
                     </div>
                 </form>
@@ -118,12 +146,39 @@
                                 <th class="px-6 py-3 text-sm font-medium text-[#6b5744] text-right">操作</th>
                             </tr>
                         </thead>
-                        <tbody id="tags-tbody">
-                            <tr>
-                                <td colspan="2" class="px-6 py-4 text-center text-sm text-gray-500">
-                                    読み込み中...
-                                </td>
-                            </tr>
+                        <tbody>
+                            @forelse ($tags as $tag)
+                                <tr class="border-b border-gray-100">
+                                    <td class="px-6 py-3 text-sm text-gray-700">
+                                        <form action="/admin/tags/{{ $tag->id }}" method="post" class="flex items-center gap-2">
+                                            @csrf
+                                            @method('PUT')
+                                            <input type="text" name="name" value="{{ $tag->name }}"
+                                                class="px-3 py-1 bg-white border border-[#ddd8d3] rounded text-gray-700 focus:outline-none focus:border-amber-500" />
+                                            <button type="submit"
+                                                class="px-3 py-1 text-xs bg-[#7d7470] text-white rounded hover:bg-[#6b5f57]">
+                                                更新
+                                            </button>
+                                        </form>
+                                    </td>
+                                    <td class="px-6 py-3 text-sm text-right">
+                                        <form action="/admin/tags/{{ $tag->id }}" method="post" class="inline">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit"
+                                                class="px-3 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600">
+                                                削除
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="2" class="px-6 py-4 text-center text-sm text-gray-500">
+                                        タグがありません
+                                    </td>
+                                </tr>
+                            @endforelse
                         </tbody>
                     </table>
                 </div>
@@ -131,22 +186,4 @@
 
         </div>
     </div>
-
-    <!-- 管理画面用の詳細モーダル -->
-    <div id="detail-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 items-center justify-center hidden">
-        <div class="bg-white rounded border border-gray-200 max-w-2xl w-full mx-4 relative">
-            <div class="flex justify-end p-4">
-                <button id="close-modal" class="text-gray-500 hover:text-gray-700 text-2xl font-bold">
-                    ×
-                </button>
-            </div>
-            <div class="modal__body px-6 pb-6">
-                <!-- 詳細情報はここにJSで挿入される -->
-            </div>
-        </div>
-    </div>
-
-    @push('scripts')
-        @vite(['resources/js/admin/index.js'])
-    @endpush
 </x-app-layout>

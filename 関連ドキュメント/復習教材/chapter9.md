@@ -2,7 +2,7 @@
 
 ## 🎯 このセクションで学ぶこと
 
-このチャプターでは、アプリケーションの「交通整理」役である**ルーティング**について学びます。ユーザーがブラウザで特定のURLにアクセスしたときや、フロントエンドのJavaScriptがAPIを呼び出したときに、どのコントローラーのどのメソッドを呼び出すかを定義するのがルーティングの役割です。URLという「住所」と、コントローラーのアクションという「目的地」を正確に結びつける方法を理解し、アプリケーション全体の血流を設計することがこのチャプターのゴールです。
+このチャプターでは、アプリケーションの「交通整理」役である**ルーティング**について学びます。ユーザーがブラウザで特定のURLにアクセスしたとき、フォームを送信したとき、管理画面を操作したときに、どのコントローラーのどのメソッドを呼び出すかを定義するのがルーティングの役割です。URLという「住所」と、コントローラーのアクションという「目的地」を正確に結びつける方法を理解し、アプリケーション全体の血流を設計することがこのチャプターのゴールです。
 
 ## 1. はじめに 📖
 
@@ -10,54 +10,64 @@
 
 ルーティングは、Webアプリケーションにおける「GPSナビゲーションシステム」と考えることができます。ユーザーが「`https://example.com/admin`」という住所（URL）を入力すると、ナビシステムであるルーターは、その住所に最も適したルート（定義されたルート）を検索し、リクエストを「管理画面表示」という目的地（コントローラーのアクション）まで正確に送り届けます。
 
-Laravelでは、このナビシステムの地図が2種類用意されています。
+このアプリケーションでは、すべてのルートを **`routes/web.php`** に集約しています。これはLaravelの伝統的なパターンであり、以下のような利点があります。
 
--   **`routes/web.php`**: Webブラウザからの通常のリクエストを処理するための地図。セッション管理やCSRF保護といった、ブラウザ利用を前提とした機能が自動で適用されます。
--   **`routes/api.php`**: JavaScriptからの非同期通信（AJAX）や、外部アプリケーションからのプログラム的なアクセスを処理するための地図。こちらは状態を持たない（ステートレスな）通信を前提としており、よりシンプルな構成になっています。
+-   **CSRF保護**: `web`ミドルウェアグループにより、フォーム送信時にCSRFトークンが自動的に検証されます。お問い合わせフォームや管理画面の操作など、POSTリクエストを伴う処理において、クロスサイトリクエストフォージェリ攻撃からアプリケーションを保護します。
+-   **セッション管理**: ログイン状態の維持や、確認画面でのデータ保持など、セッションを活用した機能がそのまま使えます。
+-   **シンプルな構成**: ルート定義が1つのファイルにまとまることで、アプリケーション全体のURL設計を一目で把握でき、保守性が向上します。
 
 前チャプターで作成したコントローラーという「目的地」は、まだ地図に載っていないため、どこからもアクセスできません。このチャプターの作業は、これらの目的地を地図に登録し、正しいURLからたどり着けるようにすることです。適切な交通整理を行うことで、アプリケーションは初めて一つのシステムとして機能し始めます。
 
 ## 2. 要件の確認 📋
 
-このアプリケーションで必要なルート（URLと機能の結びつき）の要件を整理します。
+このアプリケーションで必要なルート（URLと機能の結びつき）の要件を整理します。すべてのルートは `routes/web.php` に定義します。
 
-### Webルート (`routes/web.php`)
+### 公開ルート（認証不要）
 
-| URL | HTTPメソッド | 役割 | 認証 | 関連コントローラー・メソッド |
-| :--- | :--- | :--- | :--- | :--- |
-| `/` | GET | お問い合わせフォームページを表示する | 不要 | `ContactController@index` |
-| `/thanks` | GET | 送信完了ページを表示する | 不要 | `ContactController@thanks` |
-| `/admin` | GET | 管理画面ページを表示する | **必要** | `AdminController@index` |
+| URL | HTTPメソッド | 役割 | 関連コントローラー・メソッド |
+| :--- | :--- | :--- | :--- |
+| `/` | GET | お問い合わせフォームページを表示する | `ContactController@index` |
+| `/contacts/confirm` | POST | 確認画面を表示する | `ContactController@confirm` |
+| `/contacts` | POST | お問い合わせを登録する | `ContactController@store` |
+| `/thanks` | GET | 送信完了ページを表示する | `ContactController@thanks` |
 
-### APIルート (`routes/api.php`)
+### 管理画面ルート（認証必須）
 
-| URL | HTTPメソッド | 役割 | 認証 | 関連コントローラー・メソッド |
-| :--- | :--- | :--- | :--- | :--- |
-| `/api/categories` | GET | 全てのカテゴリーを取得する | 不要 | `Api\CategoryController@index` |
-| `/api/contacts` | GET | お問い合わせ一覧を取得する | 不要 | `Api\ContactController@index` |
-| `/api/contacts` | POST | 新しいお問い合わせを登録する | 不要 | `Api\ContactController@store` |
-| `/api/contacts/{contact}` | GET | 特定のお問い合わせを取得する | 不要 | `Api\ContactController@show` |
-| `/api/contacts/{contact}` | DELETE | 特定のお問い合わせを削除する | 不要 | `Api\ContactController@destroy` |
+| URL | HTTPメソッド | 役割 | 関連コントローラー・メソッド |
+| :--- | :--- | :--- | :--- |
+| `/admin` | GET | 管理画面ページを表示する | `AdminController@index` |
+| `/admin/contacts/{contact}` | GET | お問い合わせ詳細を表示する | `AdminController@show` |
+| `/admin/contacts/{contact}` | DELETE | お問い合わせを削除する | `AdminController@destroy` |
+| `/contacts/export` | GET | お問い合わせデータをエクスポートする | `ContactController@export` |
+| `/admin/tags` | POST | 新しいタグを作成する | `TagController@store` |
+| `/admin/tags/{tag}` | PUT | タグを更新する | `TagController@update` |
+| `/admin/tags/{tag}` | DELETE | タグを削除する | `TagController@destroy` |
 
 ## 3. 先輩エンジニアの思考プロセス 💭
 
 効率的で保守性の高いルーティングを設計するために、経験豊富なエンジニアはどのような点を考慮しているのでしょうか。
 
-### Point 1: なぜ`web.php`と`api.php`を使い分けるのか？
+### Point 1: なぜすべてのルートを`web.php`にまとめるのか？
 
-Laravelがなぜ2つのルートファイルを用意しているのか、その理由を理解することが重要です。これは「**ミドルウェアグループ**」という概念に基づいています。`routes/web.php`に記述されたルートには、自動的に`web`ミドルウェアグループが適用されます。これには、セッションの開始、CSRFトークンの検証、リクエストデータの整形など、ステートフルな（状態を持つ）ブラウザアプリケーションに必要な機能が含まれています。一方、`routes/api.php`には`api`ミドルウェアグループが適用され、こちらはステートレスな（状態を持たない）通信を前提としたシンプルな構成になっています。このように役割の違うルートを別のファイルに分離することで、設定が混在するのを防ぎ、それぞれの特性に合わせた最適な環境を簡単に適用できるのです。
+このアプリケーションでは、お問い合わせフォームの表示・送信・確認・完了という一連のフォームフローと、管理画面でのデータ管理を提供しています。これらはすべてブラウザからのリクエストであり、以下の機能が必要です。
+
+-   **CSRF保護**: フォーム送信（POST/PUT/DELETE）時に、悪意のある第三者からの不正なリクエストを防ぐためにCSRFトークンを検証します。`web`ミドルウェアグループに含まれるこの保護は、セキュリティの基本です。
+-   **セッション管理**: 確認画面でフォームの入力データを保持したり、ログイン状態を維持したりするために、セッションが必要です。`web`ミドルウェアグループではセッションが自動的に利用可能になります。
+-   **認証との統合**: `auth`ミドルウェアはセッションベースの認証を前提としています。すべてのルートが`web`ミドルウェアグループ配下にあることで、認証の仕組みがスムーズに機能します。
+
+このアプリケーションではブラウザからの利用のみを想定しているため、`web.php` に集約するのが最もシンプルで安全な設計です。
 
 ### Point 2: DRY原則に従い、ルートを「グループ化」する
 
-複数のルートに共通の属性（例えば「認証が必要」）を適用したい場合、一つ一つのルートに同じ設定を書いていくのは非効率で、ミスの元です（Don't Repeat Yourself原則の違反）。このような場合、`Route::middleware(...)`を使ってルートを**グループ化**します。例えば、管理画面に関連するルートはすべて認証が必要なので、`Route::middleware(["auth"])->group(...)`というブロックで囲みます。こうすることで、そのブロック内に記述されたすべてのルートに自動的に認証ミドルウェアが適用され、コードはすっきりと読みやすく、保守性も向上します。
+複数のルートに共通の属性（例えば「認証が必要」）を適用したい場合、一つ一つのルートに同じ設定を書いていくのは非効率で、ミスの元です（Don't Repeat Yourself原則の違反）。このような場合、`Route::middleware(...)`を使ってルートを**グループ化**します。管理画面に関連するルートはすべて認証が必要なので、`Route::middleware("auth")->group(...)`というブロックで囲みます。こうすることで、そのブロック内に記述されたすべてのルートに自動的に認証ミドルウェアが適用され、コードはすっきりと読みやすく、保守性も向上します。
 
-### Point 3: `Route::apiResource`ではなく、個別に定義する理由
+### Point 3: 公開ルートと認証ルートを明確に分離する
 
-CRUD操作のためのルートをまとめて定義できる`Route::apiResource`は非常に便利ですが、今回はあえて個別にルートを定義しています。なぜなら、`apiResource`は7つの標準的なルートを生成しますが、このアプリケーションではその一部しか必要としない、あるいは標準とは異なるURL構造を持ちたい場合があるからです。個別に`Route::get`, `Route::post`と定義することで、アプリケーションに必要なルートだけを過不足なく、かつ明確に記述することができます。特に学習段階では、どのURLがどのコントローラーのアクションに対応しているかを一つ一つ意識することが、理解を深める上で非常に重要です。
+ルートファイル内で、認証不要の公開ルートと認証必須の管理画面ルートを明確に分けて記述することが重要です。今回の設計では、ファイルの上部にお問い合わせフォーム関連の公開ルートをまとめ、下部に`Route::middleware("auth")->group(...)`で囲んだ管理画面ルートをまとめています。このように構造化することで、どのルートが誰にアクセス可能かが一目で分かり、セキュリティ上の見落としを防ぐことができます。
 
 ## 4. 実装 🚀
 
-`routes/web.php`と`routes/api.php`を編集して、アプリケーションのルートを定義します。
+`routes/web.php`を編集して、アプリケーションのすべてのルートを定義します。
 
 ### 4.1. `routes/web.php`の編集
 
@@ -69,6 +79,7 @@ CRUD操作のためのルートをまとめて定義できる`Route::apiResource
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\TagController;
 
 /*
 |--------------------------------------------------------------------------
@@ -81,69 +92,63 @@ use App\Http\Controllers\AdminController;
 |
 */
 
-// お問い合わせフォーム
+// お問い合わせフォーム（公開）
 Route::get("/", [ContactController::class, "index"]);
-
-// お問い合わせ完了
+Route::post("/contacts/confirm", [ContactController::class, "confirm"]);
+Route::post("/contacts", [ContactController::class, "store"]);
 Route::get("/thanks", [ContactController::class, "thanks"]);
 
 // 管理画面（認証必須）
 Route::middleware("auth")->group(function () {
     Route::get("/admin", [AdminController::class, "index"]);
+    Route::get("/admin/contacts/{contact}", [AdminController::class, "show"]);
+    Route::delete("/admin/contacts/{contact}", [AdminController::class, "destroy"]);
+    Route::get("/contacts/export", [ContactController::class, "export"]);
+    Route::post("/admin/tags", [TagController::class, "store"]);
+    Route::put("/admin/tags/{tag}", [TagController::class, "update"]);
+    Route::delete("/admin/tags/{tag}", [TagController::class, "destroy"]);
 });
-```
-
-### 4.2. `routes/api.php`の編集
-
-`routes/api.php`を以下のように編集します。
-
-```php
-<?php
-
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\ContactController;
-use App\Http\Controllers\Api\CategoryController;
-/*
-|--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
-|
-*/
-
-// カテゴリー一覧
-Route::get("/categories", [CategoryController::class, "index"]);
-
-// お問い合わせ一覧
-Route::get("/contacts", [ContactController::class, "index"]);
-// お問い合わせ登録
-Route::post("/contacts", [ContactController::class, "store"]);
-// お問い合わせ詳細
-Route::get("/contacts/{contact}", [ContactController::class, "show"]);
-// お問い合わせ削除
-Route::delete("/contacts/{contact}", [ContactController::class, "destroy"]);
 ```
 
 ## 5. コードの詳細解説 🔍
 
-### `routes/web.php` の解説
+### 公開ルート（お問い合わせフォーム）の解説
 
-- **`Route::get("/"), [ContactController::class, "index"])`**
-  - **何をしているか**: HTTPのGETメソッドでルートURL (`/`) にアクセスがあった場合、`App\Http\Controllers\ContactController`クラスの`index`メソッドを呼び出す、という定義です。
+- **`Route::get("/", [ContactController::class, "index"])`**
+  - **何をしているか**: HTTPのGETメソッドでルートURL (`/`) にアクセスがあった場合、`App\Http\Controllers\ContactController`クラスの`index`メソッドを呼び出す、という定義です。お問い合わせフォームの入力画面を表示します。
   - **なぜそう書くか**: `[クラス名, メソッド名]`という配列形式の記法は、Laravel 8から標準となった書き方で、IDEの補完が効きやすく、タイプミスを防げるメリットがあります。
 
-- **`Route::middleware(["auth"])->group(...)`**
-  - **何をしているか**: このグループ内のルート（今回は`/admin`）にアクセスするには、`auth`ミドルウェアによる認証（ログインしていること）が必要になります。
-  - **なぜそう書くか**: 複数のルートに同じミドルウェアを適用したい場合に、`group`でまとめることでコードの重複をなくし、保守性を高めます。ログインしていないユーザーが`/admin`にアクセスすると、自動的にログインページにリダイレクトされます。
+- **`Route::post("/contacts/confirm", [ContactController::class, "confirm"])`**
+  - **何をしているか**: フォームの入力内容をPOSTで送信し、確認画面を表示するためのルートです。
+  - **なぜPOSTか**: 確認画面にはユーザーが入力したデータを渡す必要があります。GETではURLにデータが露出してしまうため、POSTを使ってリクエストボディでデータを送信します。`web`ミドルウェアグループによりCSRFトークンが自動検証されるため、不正なフォーム送信からも保護されます。
 
-### `routes/api.php` の解説
+- **`Route::post("/contacts", [ContactController::class, "store"])`**
+  - **何をしているか**: 確認画面からの最終送信を受け付け、お問い合わせデータをデータベースに保存するルートです。
+  - **なぜそう書くか**: RESTfulなURL設計の慣例に従い、リソースの新規作成には`POST`メソッドと、リソース名のURL (`/contacts`) を使います。
 
-- **`Route::get("/contacts/{contact}"), ...)`**
-  - **何をしているか**: URLの一部に`{contact}`というプレースホルダーを含んでいます。これは**ルートモデルバインディング**という機能で、LaravelはURLの`{contact}`部分にあるIDを使って、自動的に`Contact`モデルのインスタンスを検索し、コントローラーの`show(Contact $contact)`や`destroy(Contact $contact)`メソッドに渡してくれます。
-  - **なぜそう書くか**: コントローラー側で`Contact::find($id)`のような定型コードを書く必要がなくなり、コードがよりクリーンで宣言的になります。
+- **`Route::get("/thanks", [ContactController::class, "thanks"])`**
+  - **何をしているか**: お問い合わせ送信完了後に表示する「ありがとう」ページのルートです。
+
+### 管理画面ルート（認証必須）の解説
+
+- **`Route::middleware("auth")->group(...)`**
+  - **何をしているか**: このグループ内のすべてのルートにアクセスするには、`auth`ミドルウェアによる認証（ログインしていること）が必要になります。
+  - **なぜそう書くか**: 複数のルートに同じミドルウェアを適用したい場合に、`group`でまとめることでコードの重複をなくし、保守性を高めます。ログインしていないユーザーがこれらのルートにアクセスすると、自動的にログインページにリダイレクトされます。
+
+- **`Route::get("/admin/contacts/{contact}", [AdminController::class, "show"])`**
+  - **何をしているか**: URLの一部に`{contact}`というプレースホルダーを含んでいます。これは**ルートモデルバインディング**という機能で、LaravelはURLの`{contact}`部分にあるIDを使って、自動的に`Contact`モデルのインスタンスを検索し、コントローラーの`show(Contact $contact)`メソッドに渡してくれます。
+  - **なぜそう書くか**: コントローラー側で`Contact::find($id)`のような定型コードを書く必要がなくなり、コードがよりクリーンで宣言的になります。該当するレコードが見つからない場合は自動的に404エラーが返されます。
+
+- **`Route::delete("/admin/contacts/{contact}", [AdminController::class, "destroy"])`**
+  - **何をしているか**: DELETEメソッドで特定のお問い合わせを削除するルートです。ルートモデルバインディングにより、`{contact}`のIDに対応するモデルが自動的に取得されます。
+  - **なぜDELETEメソッドか**: RESTfulなURL設計では、リソースの削除には`DELETE`メソッドを使います。HTMLフォームはGETとPOSTしかサポートしないため、Bladeテンプレートでは`@method("DELETE")`ディレクティブを使ってDELETEメソッドを擬似的に実現します。
+
+- **`Route::get("/contacts/export", [ContactController::class, "export"])`**
+  - **何をしているか**: お問い合わせデータをCSVなどの形式でエクスポートするためのルートです。認証グループ内にあるため、ログインしたユーザーのみが利用できます。
+
+- **タグ関連ルート (`/admin/tags`)**
+  - **何をしているか**: タグの作成（POST）、更新（PUT）、削除（DELETE）のルートです。`{tag}`プレースホルダーによるルートモデルバインディングで、操作対象のタグが自動的に取得されます。
+  - **なぜPUT/DELETEか**: RESTfulな設計に従い、更新にはPUT、削除にはDELETEメソッドを使います。
 
 ## 6. How to: この実装にたどり着くための調べ方 🗺️
 
@@ -154,16 +159,16 @@ Route::delete("/contacts/{contact}", [ContactController::class, "destroy"]);
 まずは、公式ドキュメントという一次情報をAIに要約してもらい、全体像を素早く掴みます。
 
 > **プロンプト例**
-> 
+>
 > 以下はLaravelの公式ドキュメントの一部です。 これを「実装できるように」分かりやすくまとめてください。
-> 
+>
 > 出力してほしい内容：
 > - 重要ポイント（10行以内）
 > - 用語の説明（重要なものだけ）
 > - できること / できないこと（境界をはっきり）
 > - よくある落とし穴（回避策つき）
 > - 最小で動かすための手順（コードはまだ不要）
-> 
+>
 > --- ここから ---
 > https://laravel.com/docs/10.x/routing
 > （ここに公式ドキュメントのURLや内容を貼り付ける）
@@ -174,13 +179,13 @@ Route::delete("/contacts/{contact}", [ContactController::class, "destroy"]);
 次に、自分の理解が正しいかを確認し、技術の「なぜ」を深く理解します。
 
 > **プロンプト例**
-> 
+>
 > Laravelのルーティングについて、私の理解はこうです：
-> 「`routes/web.php`はブラウザ用、`routes/api.php`はプログラム用で、それぞれにミドルウェアという設定が自動で適用される。URLに`{}`を使うと、その部分の値をコントローラーで受け取れる。」
-> 
+> 「`routes/web.php`にすべてのルートを定義し、`web`ミドルウェアグループによってCSRF保護とセッション管理が自動的に適用される。認証が必要なルートは`Route::middleware("auth")->group(...)`でグループ化する。URLに`{}`を使うと、ルートモデルバインディングでモデルを自動取得できる。」
+>
 > お願い：
 > 1) 正しいかチェックして、間違いがあれば「反例」で教えてください
-> 2) ミドルウェアグループの仕組みを「入力→中で起きること→出力」で説明してください
+> 2) webミドルウェアグループに含まれる機能を「入力→中で起きること→出力」で説明してください
 > 3) ルートモデルバインディングはどこまでがこの概念の範囲か（境界）を教えてください
 > 4) よくある勘違いを3つ教えてください
 > 5) 理解チェック問題を3問ください（答えつき）
@@ -190,24 +195,24 @@ Route::delete("/contacts/{contact}", [ContactController::class, "destroy"]);
 概念を理解したら、具体的な実装方法をAIに聞き、コードに落とし込みます。
 
 > **プロンプト例**
-> 
-> 目的は、管理画面(`/admin`)へのアクセスを認証済みユーザーのみに制限することです。
+>
+> 目的は、お問い合わせフォームのルート（表示・確認・登録・完了）と、管理画面のルート（認証必須）をすべて`routes/web.php`に定義することです。
 > 前提知識はPHPとLaravelのコントローラーの基本です。
-> 
+>
 > 次の順番で出力してください：
-> 
+>
 > A. 実装の手順・方針
 >  - まず全体の方針（なぜそのやり方か）
 >  - 手順を1〜Nで（各手順に「できたらOK」の条件も書く）
-> 
+>
 > B. 関連技術の解説
->  - 必要な関連知識を3〜7個（例: ミドルウェア、ルートグループ）
+>  - 必要な関連知識を3〜7個（例: ミドルウェア、ルートグループ、CSRF保護）
 >  - 各項目は「一言で説明 → この実装で何に使う → 注意点」
-> 
+>
 > C. 実装例
 >  - まず最小で動く例
 >  - 次に実務向けの拡張例（複数のルートをグループ化する例など）
-> 
+>
 > D. コードの解説
 >  - 重要な部分だけ「何をしてるか」「なぜそう書くか」
 >  - よくあるバグと対策
@@ -217,28 +222,33 @@ Route::delete("/contacts/{contact}", [ContactController::class, "destroy"]);
 最後に、自分の書いたコードや設計をAIにレビューしてもらい、改善点を見つけます。
 
 > **プロンプト例**
-> 
+>
 > 以下のルーティング設計をレビューしてください。
-> 
+>
 > - 目的：お問い合わせ管理システムのルート定義
-> - 要件：Webページ表示とCRUD操作のAPIが必要
-> - 制約：Laravel 10.x
+> - 要件：フォーム表示・確認・送信・完了と、管理画面でのCRUD操作が必要
+> - 制約：Laravel 10.x、すべてのルートを`web.php`に集約
 > - 設計案：
 > ```php
 > // web.php
 > Route::get('/', [ContactController::class, 'index']);
-> Route::get('/admin', [AdminController::class, 'index'])->middleware('auth');
-> 
-> // api.php
-> Route::apiResource('contacts', ApiContactController::class);
+> Route::post('/contacts/confirm', [ContactController::class, 'confirm']);
+> Route::post('/contacts', [ContactController::class, 'store']);
+> Route::get('/thanks', [ContactController::class, 'thanks']);
+>
+> Route::middleware('auth')->group(function () {
+>     Route::get('/admin', [AdminController::class, 'index']);
+>     Route::get('/admin/contacts/{contact}', [AdminController::class, 'show']);
+>     Route::delete('/admin/contacts/{contact}', [AdminController::class, 'destroy']);
+> });
 > ```
-> - 不安な点：`apiResource`を全て使うのは冗長ではないか？Web側のルートはグループ化すべきか？
-> 
+> - 不安な点：公開ルートと管理画面ルートの分け方は適切か？URL構造は一貫しているか？
+>
 > 見てほしい観点：
 > - 保守性（ルートが増えた時に管理しやすいか）
 > - 一貫性（命名規則やURL構造は適切か）
-> - セキュリティ（不要なルートが公開されていないか）
-> 
+> - セキュリティ（認証が必要なルートが正しく保護されているか）
+>
 > 出力：
 > - 指摘を「重要度：高/中/低」で出す
 > - 各指摘に「理由」「影響」「直し方」をつける
@@ -249,7 +259,8 @@ Route::delete("/contacts/{contact}", [ContactController::class, "destroy"]);
 このチャプターでは、アプリケーションの交通網であるルーティングを定義しました。
 
 -   **ルーティングの役割**: URLとコントローラーのアクションを結びつけ、リクエストを適切な処理に導く「GPSナビゲーション」であることを学びました。
--   **`web.php`と`api.php`**: ブラウザ向けの`web.php`と、プログラム向けの`api.php`という2つのルートファイルを、それぞれの役割に応じて使い分けました。
--   **ルートモデルバインディング**: URLのパラメータから自動でモデルを取得する便利な機能を活用しました。
+-   **`web.php`への集約**: お問い合わせフォームの公開ルートも、管理画面の認証必須ルートも、すべてを`routes/web.php`に定義しました。これにより、CSRF保護やセッション管理が自動的に適用され、セキュアでシンプルな構成を実現しています。
+-   **ルートグループによる認証制御**: `Route::middleware("auth")->group(...)`を使って管理画面のルートをグループ化し、未認証ユーザーからのアクセスを一括で制限しました。
+-   **ルートモデルバインディング**: URLのパラメータ（`{contact}`や`{tag}`）から自動でモデルを取得する便利な機能を活用しました。
 
 これで、バックエンドのすべての部品（モデル、ビュー、コントローラー、ルート）が繋がり、アプリケーションの骨格が完成しました。次の最終チャプターでは、実際にアプリケーションを動かし、正しく機能するかを確認する「動作確認」を行います。
