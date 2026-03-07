@@ -3,7 +3,7 @@
         <div class="w-full max-w-md">
             <h1 class="text-3xl font-serif text-amber-900 text-center mb-6">{{ __('Login') }}</h1>
             <div class="bg-white rounded-lg shadow-sm">
-                <form method="POST" action="{{ route('login') }}" class="px-8 py-8">
+                <form method="POST" action="{{ route('login') }}" class="px-8 py-8" novalidate>
                     @csrf
                     <!-- Email Address -->
                     <div>
