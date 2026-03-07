@@ -42,9 +42,9 @@ class ContactExportTest extends TestCase
 
         $content = $response->streamedContent();
 
-        $this->assertStringContainsString('Smith John', $content);
+        $this->assertStringContainsString('John Smith', $content);
         $this->assertStringContainsString($categoryA->content, $content);
-        $this->assertStringNotContainsString('Jones Alice', $content);
+        $this->assertStringNotContainsString('Alice Jones', $content);
     }
 
     public function test_export_without_filters_returns_all_contacts_in_latest_order(): void
@@ -69,13 +69,13 @@ class ContactExportTest extends TestCase
 
         $content = $response->streamedContent();
 
-        $this->assertStringContainsString('Adams Eve', $content);
-        $this->assertStringContainsString('Brown Mark', $content);
+        $this->assertStringContainsString('Eve Adams', $content);
+        $this->assertStringContainsString('Mark Brown', $content);
 
         $lines = array_values(array_filter(explode("\n", trim($content))));
         $firstLine = ltrim($lines[0] ?? '', "\xEF\xBB\xBF");
 
-        $this->assertStringContainsString('Brown Mark', $firstLine);
-        $this->assertStringContainsString('Adams Eve', $lines[1] ?? '');
+        $this->assertStringContainsString('Mark Brown', $firstLine);
+        $this->assertStringContainsString('Eve Adams', $lines[1] ?? '');
     }
 }
