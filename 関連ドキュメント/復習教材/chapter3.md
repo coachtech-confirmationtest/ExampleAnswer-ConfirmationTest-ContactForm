@@ -135,6 +135,9 @@ class Contact extends Model
 {
     use HasFactory;
 
+    /**
+     * マスアサインメントで代入を許可する属性。
+     */
     protected $fillable = [
         'category_id',
         'first_name',
@@ -147,6 +150,10 @@ class Contact extends Model
         'detail',
     ];
 
+    /**
+     * ContactモデルとCategoryモデルの関連を定義します。
+     * 1つのコンタクトは1つのカテゴリーに属します。
+     */
     public function category()
     {
         return $this->belongsTo(Category::class);
