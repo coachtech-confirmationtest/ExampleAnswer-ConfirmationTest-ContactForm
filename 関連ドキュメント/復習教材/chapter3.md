@@ -130,17 +130,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Contact extends Model
 {
     use HasFactory;
 
-    /**
-     * マスアサインメントで代入を許可する属性。
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'category_id',
         'first_name',
@@ -153,13 +147,7 @@ class Contact extends Model
         'detail',
     ];
 
-    /**
-     * ContactモデルとCategoryモデルの関連を定義します。
-     * 1つのコンタクトは1つのカテゴリーに属します。
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
-     */
-    public function category(): BelongsTo
+    public function category()
     {
         return $this->belongsTo(Category::class);
     }
@@ -188,7 +176,7 @@ class Contact extends Model
 
 - **`protected $fillable = [...]`**: `Contact`モデルでマスアサインメントを許可するカラムを配列で指定しています。フォームから送信される可能性のある全てのカラムをここに列挙することで、`Contact::create($request->all())`のようなコードで安全にデータを保存できます。
 
-- **`public function category(): BelongsTo`**: `Contact`モデルと`Category`モデルの「多対1」のリレーションを定義します。メソッド名は、関連するモデルの単数形（`category`）にするのが規約です。また、`: BelongsTo`は、このメソッドが`BelongsTo`という型のリレーションオブジェクトを返すことを明示しており、コードの可読性を高めています。
+- **`public function category()`**: `Contact`モデルと`Category`モデルの「多対1」のリレーションを定義します。メソッド名は、関連するモデルの単数形（`category`）にするのが規約です。
 
 - **`return $this->belongsTo(Category::class);`**: 「1つの`Contact`は、1つの`Category`に属する（`belongs to`）」という関係性を定義しています。Laravelは賢く、メソッド名`category`から、関連を紐付けるための外部キーが`category_id`であると自動的に判断します。これにより、`$contact->category`のようにして、そのお問い合わせが属するカテゴリーの情報を簡単に取得できます。
 
