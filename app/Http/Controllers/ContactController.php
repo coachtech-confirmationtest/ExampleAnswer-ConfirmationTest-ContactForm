@@ -87,7 +87,7 @@ class ContactController extends Controller
                 };
                 fputcsv($handle, [
                     $contact->id,
-                    $contact->last_name.' '.$contact->first_name,
+                    $contact->first_name.' '.$contact->last_name,
                     $genderText,
                     $contact->email,
                     $contact->tel,

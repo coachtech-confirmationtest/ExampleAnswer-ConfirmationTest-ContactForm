@@ -22,7 +22,7 @@
                         <span class="text-sm font-medium text-white">お名前</span>
                     </div>
                     <div class="col-span-2 bg-white px-6 py-4 flex items-center">
-                        <span class="text-[#6b5744]">{{ $contact->last_name }} {{ $contact->first_name }}</span>
+                        <span class="text-[#6b5744]">{{ $contact->first_name }} {{ $contact->last_name }}</span>
                     </div>
                 </div>
 

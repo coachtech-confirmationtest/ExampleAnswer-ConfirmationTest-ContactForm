@@ -86,7 +86,7 @@
                     <tbody class="divide-y divide-gray-200">
                         @forelse ($contacts as $contact)
                             <tr>
-                                <td class="px-6 py-4 text-sm text-gray-700">{{ $contact->last_name }} {{ $contact->first_name }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-700">{{ $contact->first_name }} {{ $contact->last_name }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-700">
                                     @php
                                         $genderLabels = [1 => '男性', 2 => '女性', 3 => 'その他'];
