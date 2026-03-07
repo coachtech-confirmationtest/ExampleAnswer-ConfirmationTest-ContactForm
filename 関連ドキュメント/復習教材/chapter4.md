@@ -280,11 +280,11 @@ public function create(array $input): User
 
 `Validator::make()`の第3引数に`['フィールド名.ルール名' => 'メッセージ']`形式の配列を渡すことで、バリデーションエラー時に表示されるメッセージをカスタマイズできます。この方法は、Chapter 6で学ぶFormRequestの`messages()`メソッドと同じ考え方です。
 
-### 4.8. ユーザーモデルの更新
+### 4.8. ユーザーテーブルのマイグレーション確認
 
-Fortifyは、`users`テーブルに`two_factor_secret`などのカラムが存在することを期待します。これらのカラムを追加するためのマイグレーションはFortifyに含まれていますが、既存の`users`テーブルのマイグレーションを更新する方法がシンプルです。
+今回のプロジェクトでは、Fortifyの二要素認証などの高度な機能は使用しないため、`users`テーブルのマイグレーションファイルはLaravelのデフォルトのままで問題ありません。
 
-`database/migrations/..._create_users_table.php`を開き、以下のようにカラムを追加します。
+`database/migrations/..._create_users_table.php`を開き、以下の内容になっていることを確認してください。
 
 ```php
 // database/migrations/..._create_users_table.php
@@ -311,10 +311,11 @@ sail artisan migrate:fresh
 
 これで認証機能の実装は完了です。以下の動作を確認してください。
 
-1. `/register`にアクセスし、新規ユーザー登録ができること
-2. 登録後、自動的にログイン状態になり`/admin`にリダイレクトされること（※この時点では`AdminController`が未作成のためエラー画面が表示されますが、URLが`/admin`に遷移していれば正常です）
-3. `/logout`でログアウトできること（ヘッダーのlogoutボタンを押下）
-4. `/login`から登録した情報でログインできること
+1. `/login`にアクセスし、ログインフォームが表示されること
+2. `/register`にアクセスし、新規ユーザー登録ができること
+3. 登録後、自動的にログイン状態になり`/admin`にリダイレクトされること（※この時点では`AdminController`が未作成のためエラー画面が表示されますが、URLが`/admin`に遷移していれば正常です）
+4. ブラウザの開発者ツール（Application → Cookies）でセッションCookieを削除し、ログアウト状態にする
+5. `/login`から先ほど登録した情報でログインできること
 
 管理画面（`/admin`）のルート定義と`auth`ミドルウェアによるアクセス制御は、コントローラーとルーティングを実装するチャプター（Chapter 8〜9）で行います。
 
