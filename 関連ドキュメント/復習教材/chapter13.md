@@ -120,52 +120,55 @@ class StoreContactRequest extends FormRequest
 }
 ```
 
-### 4.2. `ContactController`の`store`メソッド改修
+### 4.2. `ContactController`の改修
 
-`store`メソッドでお問い合わせの作成とタグの紐付けを実行し、完了後にサンクスページへリダイレクトします。
+Chapter 8で作成した`ContactController`に、タグ関連の処理を追加します。変更が必要なのは`index`、`confirm`、`store`の3メソッドです。
 
 **`app/Http/Controllers/ContactController.php`**
+
+まず、ファイル上部のuse文に`Tag`モデルを追加します。
+
 ```php
-<?php
-
-namespace App\Http\Controllers;
-
 use App\Http\Requests\StoreContactRequest;
-use App\Models\Contact;
 use App\Models\Category;
-use App\Models\Tag;
+use App\Models\Contact;
+use App\Models\Tag; // 追加
+```
 
-class ContactController extends Controller
+次に、各メソッドを以下のように改修します。
+
+```php
+public function index()
 {
-    public function create()
-    {
-        $categories = Category::all();
-        $tags = Tag::all();
+    $categories = Category::all();
+    $tags = Tag::all(); // 追加
 
-        return view('contacts.create', compact('categories', 'tags'));
+    return view('contact.index', compact('categories', 'tags')); // 'tags' を追加
+}
+
+public function confirm(StoreContactRequest $request)
+{
+    $validated = $request->validated();
+    $category = Category::find($validated['category_id']);
+    $tags = isset($validated['tag_ids']) ? Tag::whereIn('id', $validated['tag_ids'])->get() : collect(); // 追加
+
+    return view('contact.confirm', compact('validated', 'category', 'tags')); // 'tags' を追加
+}
+
+public function store(StoreContactRequest $request)
+{
+    $validated = $request->validated();
+    $tagIds = $validated['tag_ids'] ?? []; // 追加
+    unset($validated['tag_ids']); // 追加
+
+    $contact = Contact::create($validated); // 変更: 戻り値を変数に格納
+
+    // 追加: タグの紐付け
+    if (! empty($tagIds)) {
+        $contact->tags()->attach($tagIds);
     }
 
-    public function confirm(StoreContactRequest $request)
-    {
-        $validated = $request->validated();
-
-        return view('contacts.confirm', compact('validated'));
-    }
-
-    public function store(StoreContactRequest $request)
-    {
-        $validated = $request->validated();
-        $tagIds = $validated['tag_ids'] ?? [];
-        unset($validated['tag_ids']);
-
-        $contact = Contact::create($validated);
-
-        if (! empty($tagIds)) {
-            $contact->tags()->attach($tagIds);
-        }
-
-        return redirect('/thanks');
-    }
+    return redirect('/thanks');
 }
 ```
 
@@ -226,18 +229,38 @@ class ContactController extends Controller
 -   **`@foreach`で1つずつ出力**: `tag_ids`は配列なので、1つのhidden inputにまとめることはできません。`@foreach`で配列の各要素に対して個別のhidden inputを出力します。
 -   **`name="tag_ids[]"`**: 入力フォームと同様に`[]`を付けることで、POST先のコントローラーで配列として受け取れます。
 
-### 4.5. Eager Loadingの活用（管理画面での一覧表示）
+### 4.5. `AdminController`の改修（Eager Loading）
 
-管理画面でお問い合わせ一覧を表示する際には、紐づいたタグ情報も一緒に取得する必要があります。`AdminController@index`で`with()`メソッドを使ったEager Loadingを行うことで、N+1問題を防ぎます。
+管理画面でお問い合わせ一覧を表示する際には、紐づいたタグ情報も一緒に取得する必要があります。`AdminController@index`の`with()`メソッドにタグを追加し、ビューにもタグデータを渡します。
 
-**`app/Http/Controllers/AdminController.php`（抜粋）**
+**`app/Http/Controllers/AdminController.php`（変更箇所）**
+
+まず、ファイル上部のuse文に`Tag`モデルを追加します。
+
 ```php
-public function index()
-{
-    $contacts = Contact::with(['category', 'tags'])->latest()->paginate(7);
+use App\Models\Category;
+use App\Models\Contact;
+use App\Models\Tag; // 追加
+```
 
-    return view('admin.index', compact('contacts'));
-}
+次に、`index`メソッドと`show`メソッドの該当箇所を変更します。
+
+```php
+// index メソッド内
+$query = Contact::with(['category', 'tags']); // 変更: 'category' → ['category', 'tags']
+
+// ... 検索ロジックはそのまま ...
+
+$contacts = $query->latest()->paginate(7);
+$categories = Category::all();
+$tags = Tag::all(); // 追加
+
+return view('admin.index', compact('contacts', 'categories', 'tags')); // 'tags' を追加
+```
+
+```php
+// show メソッド内
+$contact->load(['category', 'tags']); // 変更: 'category' → ['category', 'tags']
 ```
 
 管理画面のBladeテンプレートでは、Eager Loadingされたタグ情報を表示できます。
@@ -276,7 +299,7 @@ public function index()
 
 ### `confirm`メソッドとhidden inputによるデータの受け渡し
 
--   **`confirm`メソッド**: `StoreContactRequest`でバリデーションを実行し、通過した場合に確認画面のビューを返します。バリデーション済みのデータを`$validated`として確認画面に渡します。
+-   **`confirm`メソッド**: `StoreContactRequest`でバリデーションを実行し、通過した場合に確認画面のビューを返します。バリデーション済みのデータを`$validated`として確認画面に渡します。`tag_ids`が含まれている場合は`Tag::whereIn()`で該当するタグのモデルを取得し、確認画面でタグ名を表示できるようにしています。
 -   **hidden inputの役割**: 確認画面はあくまで「表示」のための画面です。ユーザーが「送信」ボタンを押したとき、改めてPOSTリクエストが`store`メソッドに送られます。このとき、入力データを引き継ぐために、hidden inputとしてフォームに埋め込んでおく必要があります。
 -   **配列データのhidden input**: `tag_ids`のような配列データは、1つのhidden inputでは表現できません。`@foreach`で配列をループし、各要素ごとに`<input type="hidden" name="tag_ids[]" value="{{ $tagId }}">`を出力することで、POST先で配列として受け取れるようにします。
 

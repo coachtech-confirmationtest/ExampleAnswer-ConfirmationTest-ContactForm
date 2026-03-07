@@ -91,85 +91,76 @@ class ExportContactRequest extends FormRequest
 
 ### 4.2. `ContactController`の改修
 
-次に、`app/Http/Controllers/ContactController.php`に`export`メソッドを実装します。
+`app/Http/Controllers/ContactController.php`に`export`メソッドを追加します。
+
+まず、ファイル上部のuse文に`ExportContactRequest`を追加します。
 
 ```php
-<?php
-
-namespace App\Http\Controllers;
-
-use App\Http\Requests\ExportContactRequest;
-use App\Http\Controllers\Controller;
+use App\Http\Requests\ExportContactRequest; // 追加
+use App\Http\Requests\StoreContactRequest;
+use App\Models\Category;
 use App\Models\Contact;
+use App\Models\Tag;
+```
 
-class ContactController extends Controller
+次に、`ContactController`クラスに以下の`export`メソッドを追加します。
+
+```php
+public function export(ExportContactRequest $request)
 {
-    public function index()
-    {
-        return view('contact.index');
+    $query = Contact::with('category');
+
+    if ($request->filled('keyword')) {
+        $keyword = $request->keyword;
+        $query->where(function ($q) use ($keyword) {
+            $q->where('first_name', 'like', "%{$keyword}%")
+                ->orWhere('last_name', 'like', "%{$keyword}%")
+                ->orWhere('email', 'like', "%{$keyword}%");
+        });
     }
 
-    public function thanks()
-    {
-        return view('contact.thanks');
+    if ($request->filled('gender') && $request->gender != 0) {
+        $query->where('gender', $request->gender);
     }
 
-    public function export(ExportContactRequest $request)
-    {
-        $query = Contact::with('category');
-
-        if ($request->filled('keyword')) {
-            $keyword = $request->keyword;
-            $query->where(function ($q) use ($keyword) {
-                $q->where('first_name', 'like', "%{$keyword}%")
-                    ->orWhere('last_name', 'like', "%{$keyword}%")
-                    ->orWhere('email', 'like', "%{$keyword}%");
-            });
-        }
-
-        if ($request->filled('gender') && $request->gender != 0) {
-            $query->where('gender', $request->gender);
-        }
-
-        if ($request->filled('category_id')) {
-            $query->where('category_id', $request->category_id);
-        }
-
-        if ($request->filled('date')) {
-            $query->whereDate('created_at', $request->date);
-        }
-
-        $contacts = $query->latest()->get();
-
-        return response()->streamDownload(function () use ($contacts) {
-            $handle = fopen('php://output', 'w');
-            // BOMを追加（Excel対応）
-            fwrite($handle, "\xEF\xBB\xBF");
-            foreach ($contacts as $contact) {
-                $genderText = match ($contact->gender) {
-                    1 => '男性',
-                    2 => '女性',
-                    3 => 'その他',
-                    default => '',
-                };
-                fputcsv($handle, [
-                    $contact->id,
-                    $contact->last_name . ' ' . $contact->first_name,
-                    $genderText,
-                    $contact->email,
-                    $contact->tel,
-                    $contact->address,
-                    $contact->building ?? '',
-                    $contact->category->content ?? '',
-                    $contact->detail,
-                    $contact->created_at->format('Y-m-d H:i:s'),
-                ]);
-            }
-            fclose($handle);
-        }, 'contacts_' . now()->format('Ymd_His') . '.csv', [
-            'Content-Type' => 'text/csv',
-        ]);
+    if ($request->filled('category_id')) {
+        $query->where('category_id', $request->category_id);
     }
+
+    if ($request->filled('date')) {
+        $query->whereDate('created_at', $request->date);
+    }
+
+    $contacts = $query->latest()->get();
+
+    return response()->streamDownload(function () use ($contacts) {
+        $handle = fopen('php://output', 'w');
+        // BOMを追加（Excel対応）
+        fwrite($handle, "\xEF\xBB\xBF");
+        foreach ($contacts as $contact) {
+            $genderText = match ($contact->gender) {
+                1 => '男性',
+                2 => '女性',
+                3 => 'その他',
+                default => '',
+            };
+            fputcsv($handle, [
+                $contact->id,
+                $contact->last_name . ' ' . $contact->first_name,
+                $genderText,
+                $contact->email,
+                $contact->tel,
+                $contact->address,
+                $contact->building ?? '',
+                $contact->category->content ?? '',
+                $contact->detail,
+                $contact->created_at->format('Y-m-d H:i:s'),
+            ]);
+        }
+        fclose($handle);
+    }, 'contacts_' . now()->format('Ymd_His') . '.csv', [
+        'Content-Type' => 'text/csv',
+    ]);
 }
 ```
 
@@ -178,19 +169,17 @@ class ContactController extends Controller
 `routes/web.php`にCSVエクスポート用のルートを追加します。認証が必要な管理画面の機能なので、`auth`ミドルウェアグループの中に追加します。
 
 **`routes/web.php`**
+
+`auth`ミドルウェアグループの中に、以下の1行を追記してください。
+
 ```php
-<?php
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\ContactController;
-use App\Http\Controllers\AdminController;
-
-// ... (中略) ...
-
 // 管理画面（認証必須）
-Route::middleware('auth')->group(function () {
-    Route::get('/admin', [AdminController::class, 'index']);
-    // ここに追加
-    Route::get('/contacts/export', [ContactController::class, 'export']);
+Route::middleware("auth")->group(function () {
+    Route::get("/admin", [AdminController::class, "index"]);
+    Route::get("/admin/contacts/{contact}", [AdminController::class, "show"]);
+    Route::delete("/admin/contacts/{contact}", [AdminController::class, "destroy"]);
+    Route::get("/contacts/export", [ContactController::class, "export"]); // 追加
+    // ... タグ関連ルート ...
 });
 ```
 

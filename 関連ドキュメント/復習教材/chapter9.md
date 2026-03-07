@@ -38,10 +38,6 @@
 | `/admin` | GET | 管理画面ページを表示する | `AdminController@index` |
 | `/admin/contacts/{contact}` | GET | お問い合わせ詳細を表示する | `AdminController@show` |
 | `/admin/contacts/{contact}` | DELETE | お問い合わせを削除する | `AdminController@destroy` |
-| `/contacts/export` | GET | お問い合わせデータをエクスポートする | `ContactController@export` |
-| `/admin/tags` | POST | 新しいタグを作成する | `TagController@store` |
-| `/admin/tags/{tag}` | PUT | タグを更新する | `TagController@update` |
-| `/admin/tags/{tag}` | DELETE | タグを削除する | `TagController@destroy` |
 
 ## 3. 先輩エンジニアの思考プロセス 💭
 
@@ -79,7 +75,6 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\AdminController;
-use App\Http\Controllers\TagController;
 
 /*
 |--------------------------------------------------------------------------
@@ -103,10 +98,6 @@ Route::middleware("auth")->group(function () {
     Route::get("/admin", [AdminController::class, "index"]);
     Route::get("/admin/contacts/{contact}", [AdminController::class, "show"]);
     Route::delete("/admin/contacts/{contact}", [AdminController::class, "destroy"]);
-    Route::get("/contacts/export", [ContactController::class, "export"]);
-    Route::post("/admin/tags", [TagController::class, "store"]);
-    Route::put("/admin/tags/{tag}", [TagController::class, "update"]);
-    Route::delete("/admin/tags/{tag}", [TagController::class, "destroy"]);
 });
 ```
 
@@ -142,13 +133,6 @@ Route::middleware("auth")->group(function () {
 - **`Route::delete("/admin/contacts/{contact}", [AdminController::class, "destroy"])`**
   - **何をしているか**: DELETEメソッドで特定のお問い合わせを削除するルートです。ルートモデルバインディングにより、`{contact}`のIDに対応するモデルが自動的に取得されます。
   - **なぜDELETEメソッドか**: RESTfulなURL設計では、リソースの削除には`DELETE`メソッドを使います。HTMLフォームはGETとPOSTしかサポートしないため、Bladeテンプレートでは`@method("DELETE")`ディレクティブを使ってDELETEメソッドを擬似的に実現します。
-
-- **`Route::get("/contacts/export", [ContactController::class, "export"])`**
-  - **何をしているか**: お問い合わせデータをCSVなどの形式でエクスポートするためのルートです。認証グループ内にあるため、ログインしたユーザーのみが利用できます。
-
-- **タグ関連ルート (`/admin/tags`)**
-  - **何をしているか**: タグの作成（POST）、更新（PUT）、削除（DELETE）のルートです。`{tag}`プレースホルダーによるルートモデルバインディングで、操作対象のタグが自動的に取得されます。
-  - **なぜPUT/DELETEか**: RESTfulな設計に従い、更新にはPUT、削除にはDELETEメソッドを使います。
 
 ## 6. How to: この実装にたどり着くための調べ方 🗺️
 
@@ -261,6 +245,6 @@ Route::middleware("auth")->group(function () {
 -   **ルーティングの役割**: URLとコントローラーのアクションを結びつけ、リクエストを適切な処理に導く「GPSナビゲーション」であることを学びました。
 -   **`web.php`への集約**: お問い合わせフォームの公開ルートも、管理画面の認証必須ルートも、すべてを`routes/web.php`に定義しました。これにより、CSRF保護やセッション管理が自動的に適用され、セキュアでシンプルな構成を実現しています。
 -   **ルートグループによる認証制御**: `Route::middleware("auth")->group(...)`を使って管理画面のルートをグループ化し、未認証ユーザーからのアクセスを一括で制限しました。
--   **ルートモデルバインディング**: URLのパラメータ（`{contact}`や`{tag}`）から自動でモデルを取得する便利な機能を活用しました。
+-   **ルートモデルバインディング**: URLのパラメータ（`{contact}`）から自動でモデルを取得する便利な機能を活用しました。
 
 これで、バックエンドのすべての部品（モデル、ビュー、コントローラー、ルート）が繋がり、アプリケーションの基本的な骨格が完成しました。次のチャプターでは、応用機能としてお問い合わせにタグを付与するための**タグ機能のデータベース設計（マイグレーション）**を行います。
