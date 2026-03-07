@@ -99,15 +99,17 @@ class RouteServiceProvider extends ServiceProvider
 
 #### 4.3.2. `fortify.php`の変更
 
-次に、Fortify自体の設定ファイルである`config/fortify.php`を開き、`home`の値を変更します。これにより、Fortifyの認証プロセスが完了した後のリダイレクト先が明確に指定されます。
+次に、Fortify自体の設定ファイルである`config/fortify.php`を開き、`home`の値を変更します。ここでは値を直接書くのではなく、先ほど変更した`RouteServiceProvider::HOME`定数を参照させます。こうすることで、リダイレクト先の定義が一箇所（`RouteServiceProvider`）に集約され、変更時の修正漏れを防げます。
 
 ```php
 // config/fortify.php
 
+use App\Providers\RouteServiceProvider;
+
 return [
     // ...
 
-    'home' => '/admin', // '/home' から '/admin' に変更
+    'home' => RouteServiceProvider::HOME, // RouteServiceProviderのHOME定数を参照
 
     // ...
 ];
