@@ -20,8 +20,8 @@ class ContactSeeder extends Seeder
         // サンプルデータを20件作成
         for ($i = 0; $i < 20; $i++) {
             Contact::create([
-                'first_name' => $faker->firstName,
-                'last_name' => $faker->lastName,
+                'first_name' => $faker->lastName,
+                'last_name' => $faker->firstName,
                 'gender' => $faker->numberBetween(1, 3),
                 'email' => $faker->unique()->safeEmail,
                 'tel' => $faker->numerify('###########'),

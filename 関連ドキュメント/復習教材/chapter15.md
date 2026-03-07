@@ -130,8 +130,8 @@ class ContactFactory extends Factory
     {
         return [
             'category_id' => Category::factory(),
-            'first_name' => $this->faker->firstName(),
-            'last_name' => $this->faker->lastName(),
+            'first_name' => $this->faker->lastName(),
+            'last_name' => $this->faker->firstName(),
             'gender' => $this->faker->numberBetween(1, 3),
             'email' => $this->faker->unique()->safeEmail(),
             'tel' => $this->faker->numerify('0##########'),
@@ -145,7 +145,7 @@ class ContactFactory extends Factory
 
 ### コード解説
 - `'category_id' => Category::factory()`: `Contact`モデルは`Category`モデルに属しているため、`Contact`を作成する際に、関連する`Category`も自動で作成するように定義しています。
-- `$this->faker->firstName()`: Fakerを使って、リアルな「名」を生成します。
+- `$this->faker->lastName()`: Fakerを使って、リアルな「姓」を生成します。このプロジェクトでは`first_name`カラムに姓を格納するため、Fakerの`lastName`を使います。同様に`last_name`カラムには`firstName`で「名」を格納します。
 - `$this->faker->numerify('0##########')`: ` #` をランダムな数字（0-9）に置き換えます。先頭の`0`を固定し、残り10桁をランダムにして11桁の電話番号を生成しています。
 - `$this->faker->optional()->secondaryAddress()`: 50%の確率で`null`を、そうでなければ建物の部屋番号などを生成します。`building`カラムが`nullable`な場合に対応できます。
 

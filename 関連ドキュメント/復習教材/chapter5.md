@@ -138,8 +138,8 @@ class ContactSeeder extends Seeder
         // サンプルデータを20件作成
         for ($i = 0; $i < 20; $i++) {
             Contact::create([
-                'first_name' => $faker->firstName,
-                'last_name' => $faker->lastName,
+                'first_name' => $faker->lastName,
+                'last_name' => $faker->firstName,
                 'gender' => $faker->numberBetween(1, 3),
                 'email' => $faker->unique()->safeEmail,
                 'tel' => $faker->numerify('###########'),
@@ -207,7 +207,7 @@ sail artisan migrate:fresh --seed
 - **`$categories = Category::all();`**: `categories`テーブルからすべてのレコードを取得し、コレクションとして`$categories`に格納します。
 - **`for ($i = 0; $i < 20; $i++) { ... }`**: 20回ループを回し、20件のダミーデータを作成します。
 - **`Contact::create([...])`**: `Contact`モデルの`create`メソッドを使い、新しいレコードをデータベースに作成します。引数には、カラム名をキー、生成する値をバリューとする連想配列を渡します。
-- **`'first_name' => $faker->firstName`**: Fakerを使って、本物らしい「名」を生成します。
+- **`'first_name' => $faker->lastName`**: Fakerの`lastName`を使って、本物らしい「姓」を生成します。このプロジェクトでは`first_name`カラムに姓を格納します（フォームのplaceholder「例: 山田」参照）。同様に`last_name`カラムには`firstName`で「名」を格納します。
 - **`'gender' => $faker->numberBetween(1, 3)`**: 1から3までのランダムな整数を生成します。
 - **`'email' => $faker->unique()->safeEmail`**: `unique()`を付けることで、このシーダー実行中に重複しないメールアドレスを保証します。`safeEmail`は、`example.com`のような安全なドメインのメールアドレスを生成します。
 - **`'tel' => $faker->numerify('###########')`**: `#`をランダムな数字（0-9）に置き換えます。ここでは11桁の数字文字列を生成しています。
