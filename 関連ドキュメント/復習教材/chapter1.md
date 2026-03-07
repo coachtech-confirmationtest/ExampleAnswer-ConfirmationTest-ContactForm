@@ -174,7 +174,7 @@ export default {
 
 **5. bladeファイルの挿入**
 
-本プロジェクトのresourseファイルを[coachtech-prepared-blade-list/Preparedblade-ConfirmationTest-ContactForm](https://github.com/coachtech-prepared-blade-list/Preparedblade-ConfirmationTest-ContactForm) リポジトリのmainブランチにあるresourseファイルと入れ替えてください。
+本プロジェクトのresourseファイルを[coachtech-prepared-file/Preparedblade-ConfirmationTest-ContactForm](https://github.com/coachtech-prepared-blade-list/Preparedblade-ConfirmationTest-ContactForm) リポジトリのmainブランチにあるresourseファイルと入れ替えてください。
 openコマンドを利用してcloneしてきたファイルをGUIで移動する、もしくはmvコマンドを活用して入れ替えるのが最も早い方法です。
 
 **6. Vite開発サーバーの起動**
