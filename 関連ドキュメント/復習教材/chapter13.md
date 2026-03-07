@@ -174,35 +174,40 @@ public function store(StoreContactRequest $request)
 
 ### 4.3. 入力フォームでのタグ表示（`_form.blade.php`）
 
-入力画面では、サーバーサイドから渡された`$tags`変数を使って、`@foreach`でタグのチェックボックスを描画します。
+提供Bladeファイル（`_form.blade.php`）には、タグのチェックボックス表示が `@isset($tags)` で囲まれた状態で既に記載されています。基礎機能フェーズではコントローラーから `$tags` を渡していなかったため非表示でしたが、上記の `index` メソッドで `$tags` を渡すようにしたことで、自動的にタグのチェックボックスが表示されるようになります。
 
-**`resources/views/contacts/_form.blade.php`（タグ部分の抜粋）**
+**`resources/views/contact/_form.blade.php`（タグ部分の抜粋）**
 ```blade
-<div class="form-group">
-    <label>タグ</label>
-    <div class="tag-checkboxes">
-        @foreach ($tags as $tag)
-            <label>
-                <input type="checkbox" name="tag_ids[]" value="{{ $tag->id }}"
-                    {{ in_array($tag->id, old('tag_ids', [])) ? 'checked' : '' }}>
-                {{ $tag->name }}
-            </label>
-        @endforeach
+@isset($tags)
+<div class="grid grid-cols-3 gap-8 mb-4">
+    <!-- ... ラベル部分省略 ... -->
+    <div class="col-span-2">
+        <div class="flex flex-wrap gap-4 py-3">
+            @foreach ($tags as $tag)
+                <label class="flex items-center cursor-pointer">
+                    <input type="checkbox" name="tag_ids[]" value="{{ $tag->id }}"
+                        {{ in_array($tag->id, old('tag_ids', [])) ? 'checked' : '' }} />
+                    <span class="ml-2 text-gray-700">{{ $tag->name }}</span>
+                </label>
+            @endforeach
+        </div>
     </div>
 </div>
+@endisset
 ```
 
 ここでのポイントは以下の通りです。
 
--   **`$tags`はサーバーサイドから渡される**: `ContactController@create`で`Tag::all()`を取得し、`compact('tags')`でビューに渡しています。
+-   **`@isset($tags)`**: `$tags` 変数がコントローラーから渡されている場合のみ、タグセクションを表示します。基礎機能フェーズでは非表示だったものが、このチャプターで `$tags` を渡すことで表示されるようになります。
+-   **`$tags`はサーバーサイドから渡される**: `ContactController@index`で`Tag::all()`を取得し、`compact('tags')`でビューに渡しています。
 -   **`name="tag_ids[]"`**: `[]`を付けることで、チェックされた複数の値がPHP側で配列として受け取れます。
 -   **`old('tag_ids', [])`**: バリデーションエラー時に、以前選択していたタグを復元するために`old()`ヘルパーを使用しています。
 
 ### 4.4. 確認画面でのhidden inputによるデータの受け渡し
 
-確認画面（`confirm.blade.php`）では、バリデーション済みのデータをユーザーに表示しつつ、次の`store`アクションに渡すためにhidden inputとして埋め込みます。`tag_ids`は配列なので、`@foreach`でループして1つずつhidden inputを出力します。
+確認画面（`confirm.blade.php`）でも、タグ名の表示部分は `@isset($tags)` で囲まれており、`confirm` メソッドから `$tags` を渡すことで自動的に表示されます。また、次の`store`アクションにデータを渡すためにhidden inputとして埋め込みます。`tag_ids`は配列なので、`@foreach`でループして1つずつhidden inputを出力します。
 
-**`resources/views/contacts/confirm.blade.php`（tag_ids部分の抜粋）**
+**`resources/views/contact/confirm.blade.php`（tag_ids部分の抜粋）**
 ```blade
 <form action="/contacts" method="POST">
     @csrf
@@ -263,22 +268,7 @@ return view('admin.index', compact('contacts', 'categories', 'tags')); // 'tags'
 $contact->load(['category', 'tags']); // 変更: 'category' → ['category', 'tags']
 ```
 
-管理画面のBladeテンプレートでは、Eager Loadingされたタグ情報を表示できます。
-
-```blade
-@foreach ($contacts as $contact)
-    <tr>
-        <td>{{ $contact->first_name }} {{ $contact->last_name }}</td>
-        <td>{{ $contact->email }}</td>
-        <td>{{ $contact->category->content }}</td>
-        <td>
-            @foreach ($contact->tags as $tag)
-                <span class="tag-badge">{{ $tag->name }}</span>
-            @endforeach
-        </td>
-    </tr>
-@endforeach
-```
+管理画面のBladeテンプレート（`admin/index.blade.php`）では、タグ管理セクションが `@isset($tags)` で囲まれています。`AdminController@index` から `$tags` を渡すことで、タグの一覧表示・追加・編集・削除のUIが自動的に表示されるようになります。また、お問い合わせ一覧のタグ列も `method_exists` で防御されているため、`tags()` リレーション定義後に自動的に表示されます。
 
 ## 5. コードの詳細解説 🔍
 
