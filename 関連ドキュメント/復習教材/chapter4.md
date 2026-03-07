@@ -177,7 +177,100 @@ public function boot(): void
     }
 ```
 
-### 4.6. ユーザーモデルの更新
+### 4.6. アプリケーションの日本語化設定
+
+バリデーションエラーメッセージを日本語で表示するために、アプリケーションのロケール（言語設定）を変更します。`config/app.php`を開き、`locale`の値を`'ja'`に変更します。
+
+```php
+// config/app.php
+
+'locale' => 'ja', // 'en' から 'ja' に変更
+```
+
+この設定により、Laravelはバリデーションやエラーメッセージを表示する際に、`lang/ja/`ディレクトリ内の言語ファイルを参照するようになります。
+
+### 4.7. バリデーションメッセージの日本語化
+
+認証画面のバリデーションメッセージを日本語で表示するために、2つの対応が必要です。
+
+#### 4.7.1. ログイン画面用の言語ファイル作成
+
+まず、`lang/ja/`ディレクトリを作成し、その中に言語ファイルを配置します。
+
+```bash
+mkdir -p lang/ja
+```
+
+**ログイン認証失敗メッセージ**として、`lang/ja/auth.php`を以下の内容で作成します。
+
+```php
+<?php
+// lang/ja/auth.php
+
+return [
+    'failed' => 'ログイン情報が登録されていません',
+];
+```
+
+次に、**ログインフォームのバリデーションメッセージ**として、`lang/ja/validation.php`を以下の内容で作成します。
+
+```php
+<?php
+// lang/ja/validation.php
+
+return [
+    'custom' => [
+        'email' => [
+            'required' => 'メールアドレスを入力してください',
+            'email' => 'メールアドレスはメール形式で入力してください',
+        ],
+        'password' => [
+            'required' => 'パスワードを入力してください',
+        ],
+    ],
+];
+```
+
+`custom`キーを使うことで、特定のフィールドに対してのみカスタムメッセージを定義できます。ログインフォームのバリデーションはFortifyが内部で処理するため、この言語ファイルを通じてメッセージをカスタマイズします。
+
+#### 4.7.2. 会員登録画面のバリデーションメッセージ
+
+会員登録のバリデーションは、`app/Actions/Fortify/CreateNewUser.php`の`Validator::make()`で行われています。このファイルを開き、第3引数にカスタムメッセージを追加します。
+
+```php
+// app/Actions/Fortify/CreateNewUser.php
+
+public function create(array $input): User
+{
+    Validator::make($input, [
+        'name' => ['required', 'string', 'max:255'],
+        'email' => [
+            'required',
+            'string',
+            'email',
+            'max:255',
+            Rule::unique(User::class),
+        ],
+        'password' => $this->passwordRules(),
+    ], [
+        'name.required' => 'お名前を入力してください',
+        'email.required' => 'メールアドレスを入力してください',
+        'email.email' => 'メールアドレスはメール形式で入力してください',
+        'password.required' => 'パスワードを入力してください',
+        'password.confirmed' => 'パスワードと一致しません',
+    ])->validate();
+
+    return User::create([
+        'name' => $input['name'],
+        'email' => $input['email'],
+        'password' => Hash::make($input['password']),
+    ]);
+}
+```
+
+`Validator::make()`の第3引数に`['フィールド名.ルール名' => 'メッセージ']`形式の配列を渡すことで、バリデーションエラー時に表示されるメッセージをカスタマイズできます。この方法は、Chapter 6で学ぶFormRequestの`messages()`メソッドと同じ考え方です。
+
+### 4.8. ユーザーモデルの更新
 
 Fortifyは、`users`テーブルに`two_factor_secret`などのカラムが存在することを期待します。これらのカラムを追加するためのマイグレーションはFortifyに含まれていますが、既存の`users`テーブルのマイグレーションを更新する方法がシンプルです。
 
@@ -204,7 +297,7 @@ Schema::create("users", function (Blueprint $table) {
 sail artisan migrate:fresh
 ```
 
-### 4.7. 動作確認
+### 4.9. 動作確認
 
 これで認証機能の実装は完了です。以下の動作を確認してください。
 
@@ -232,6 +325,18 @@ sail artisan migrate:fresh
 ### `app/Providers/FortifyServiceProvider.php` のビュー設定
 - **何をしているか**: `Fortify::loginView(...)`や`Fortify::registerView(...)`を使い、Fortifyに「ログインが必要な場面になったら、このビューを表示してください」と教えています。
 - **なぜそう書くか**: FortifyはUIを持たないため、開発者がどのビューを使うかを明示的に指定する必要があります。`view('auth.login')`のように、`resources/views`からのパスをドット記法で指定するのがLaravelの標準です。
+
+### `config/app.php` のロケール設定
+- **何をしているか**: `'locale' => 'ja'`と設定することで、Laravelのバリデーションやエラーメッセージの言語を日本語に切り替えています。Laravelは`lang/{locale}/`ディレクトリ内の言語ファイルを参照してメッセージを取得します。
+- **なぜそう書くか**: デフォルトの`'en'`（英語）のままでは、バリデーションエラーが英語で表示されます。日本語のアプリケーションでは、ユーザーに分かりやすい日本語メッセージを表示するためにロケールを`'ja'`に変更します。
+
+### `Validator::make()` の第3引数（カスタムメッセージ）
+- **何をしているか**: `Validator::make($data, $rules, $messages)`の第3引数に、`'フィールド名.ルール名' => 'カスタムメッセージ'`形式の配列を渡すことで、デフォルトのエラーメッセージを上書きしています。
+- **なぜそう書くか**: 言語ファイルによるグローバルなメッセージ設定とは別に、特定のバリデーターでのみ使用するメッセージをピンポイントで定義できます。言語ファイルよりも優先度が高いため、確実にカスタムメッセージが表示されます。
+
+### `lang/ja/validation.php` の `custom` キー
+- **何をしているか**: 言語ファイル内の`custom`配列で、フィールドごとにバリデーションルール別のメッセージを定義しています。Fortifyが内部で行うログインバリデーションのメッセージは、直接コードを変更できないため、この言語ファイルを通じてカスタマイズします。
+- **なぜそう書くか**: `custom`キーを使うことで、汎用メッセージではなくフィールド固有のメッセージを定義できます。例えば「emailフィールドのrequiredルール」だけに「メールアドレスを入力してください」というメッセージを設定でき、他のフィールドのrequiredメッセージには影響しません。
 
 ### `routes/web.php` のルート保護
 - **何をしているか**: `Route::middleware('auth')->group(...)`を使い、クロージャ内に定義された全てのルートを`auth`ミドルウェアで保護しています。
