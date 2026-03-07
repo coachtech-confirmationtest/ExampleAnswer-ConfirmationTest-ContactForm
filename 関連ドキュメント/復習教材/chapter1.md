@@ -42,7 +42,7 @@
 
 ### Point 2: 「楽をしたい」は正義である → Laravel Sailの活用
 
-Dockerは非常に強力ですが、設定ファイル（`docker-compose.yml`）の記述やコマンドが複雑で、初学者にとっては少し敷居が高いのも事実です。しかし、Laravelチームは「開発者がもっと創造的な作業に集中できるように」という思想のもと、この複雑さを隠蔽してくれるLaravel Sailを提供してくれました。Sailは、Laravel開発に最適化されたDocker環境を、`sail up`や`sail artisan`といったシンプルなコマンドで操作できるようにしたものです。これは、いわば「Laravel専用の全自動キッチンシステム」のようなもの。私たちは、キッチンの配管や電気工事（Dockerの詳細設定）を気にすることなく、すぐに料理（コーディング）を始めることができるのです。この「楽をするための工夫」こそが、生産性を高める鍵となります。
+Dockerは非常に強力ですが、設定ファイル（`docker-compose.yml`）の記述やコマンドが複雑で、初学者にとっては少し敷居が高いのも事実です。しかし、Laravelチームは「開発者がもっと創造的な作業に集中できるように」という思想のもと、この複雑なDockerの設定を自動化し、手軽に扱えるようにしてくれるLaravel Sailを提供してくれました。Sailは、Laravel開発に最適化されたDocker環境を、`sail up`や`sail artisan`といったシンプルなコマンドで操作できるようにしたものです。これは、いわば「Laravel専用の全自動キッチンシステム」のようなもの。私たちは、キッチンの配管や電気工事（Dockerの詳細設定）を気にすることなく、すぐに料理（コーディング）を始めることができるのです。この「楽をするための工夫」こそが、生産性を高める鍵となります。
 
 ### Point 3: フロントエンド開発の効率を最大化する → ViteとTailwind CSS
 
@@ -125,11 +125,28 @@ DB_PASSWORD=password
 ./vendor/bin/sail up -d
 ```
 
+> **⚠️ Apple Silicon (M1/M2) Macをお使いの方へ**
+>
+> `./vendor/bin/sail up -d` 実行時に、MySQLやphpMyAdminのコンテナでプラットフォームエラーが発生する場合があります。その場合は、`compose.yaml` の該当サービスに以下の設定を追加してください。
+>
+> ```yaml
+> platform: linux/amd64
+> ```
+>
+> 例えば、`mysql` サービスと `phpmyadmin` サービスそれぞれの `image:` の下に追記します。
+
 **2. エイリアスの設定**
 
+**Zsh（macOS）の場合:**
 ```bash
 echo "alias sail=\"[ -f sail ] && bash sail || bash vendor/bin/sail\"" >> ~/.zshrc
 source ~/.zshrc
+```
+
+**Bash（Linux/WSL）の場合:**
+```bash
+echo "alias sail='[ -f sail ] && bash sail || bash vendor/bin/sail'" >> ~/.bashrc
+source ~/.bashrc
 ```
 
 #### フロントエンドのセットアップ (Vite & Tailwind CSS)

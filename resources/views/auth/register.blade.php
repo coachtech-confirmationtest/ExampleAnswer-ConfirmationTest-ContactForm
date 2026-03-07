@@ -59,6 +59,16 @@
                         @endif
                     </div>
 
+                    <!-- Confirm Password -->
+                    <div class="mt-4">
+                        <label for="password_confirmation" class="block font-medium text-sm text-amber-900">
+                            {{ __('パスワード確認') }}
+                        </label>
+                        <input id="password_confirmation"
+                            class="block mt-1 w-full border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-300 focus:border-amber-500 focus:ring-amber-500 rounded-md shadow-sm px-3 py-2"
+                            type="password" name="password_confirmation" placeholder="password" required />
+                    </div>
+
                     <div class="flex items-center justify-center mt-6">
                         <button type="submit"
                             class="inline-flex items-center px-6 py-2 bg-[#82746a] hover:bg-[#6b5f57] focus:bg-[#6b5f57] active:bg-[#5a4f47] border border-transparent rounded-md font-semibold text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#82746a] focus:ring-offset-2 transition ease-in-out duration-150 disabled:opacity-25">

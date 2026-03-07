@@ -51,6 +51,21 @@ Laravelのテストは、大きく分けて2種類あります。
 - `<env name="DB_CONNECTION" value="mysql"/>`: テストに使用するデータベースの種類を指定します。
 - `<env name="DB_DATABASE" value="contact_form_test"/>`: テスト専用のデータベース名を指定します。このデータベースは事前に作成しておく必要があります。
 
+> **💡 テスト用データベースの作成**
+>
+> `contact_form_test` データベースは事前に作成しておく必要があります。phpMyAdmin（`http://localhost:8080`）にアクセスし、新しいデータベース `contact_form_test` を作成してください。
+> または、以下のコマンドでも作成できます。
+>
+> ```bash
+> sail mysql -u root -ppassword -e "CREATE DATABASE IF NOT EXISTS contact_form_test;"
+> ```
+>
+> もし権限エラーが発生する場合は、以下のコマンドで権限を付与してください。
+>
+> ```bash
+> sail mysql -u root -ppassword -e "GRANT ALL PRIVILEGES ON contact_form_test.* TO 'sail'@'%'; FLUSH PRIVILEGES;"
+> ```
+
 > **💡 なぜインメモリDB（sqlite, :memory:）を使わないの？**
 > インメモリデータベースは高速ですが、MySQLなどの実際の運用環境とは挙動が異なる場合があります。特に、MySQL特有の関数や制約を使用している場合、テストが通っても本番でエラーになる可能性があります。今回は、より本番環境に近い形でテストを行うため、MySQLを使用します。
 
@@ -61,7 +76,7 @@ Laravelのテストは、大きく分けて2種類あります。
 ### 4.1 CategoryFactory
 
 ```bash
-php artisan make:factory CategoryFactory --model=Category
+sail artisan make:factory CategoryFactory --model=Category
 ```
 
 作成された`database/factories/CategoryFactory.php`を以下のように編集します。
@@ -100,7 +115,7 @@ class CategoryFactory extends Factory
 ### 4.2 ContactFactory
 
 ```bash
-php artisan make:factory ContactFactory --model=Contact
+sail artisan make:factory ContactFactory --model=Contact
 ```
 
 作成された`database/factories/ContactFactory.php`を以下のように編集します。
@@ -131,11 +146,11 @@ class ContactFactory extends Factory
             'first_name' => $this->faker->firstName(),
             'last_name' => $this->faker->lastName(),
             'gender' => $this->faker->numberBetween(1, 3),
-            'email' => $this->faker->safeEmail(),
-            'tel' => $this->faker->numerify('###########'),
-            'address' => $this->faker->address(),
+            'email' => $this->faker->unique()->safeEmail(),
+            'tel' => $this->faker->numerify('0##########'),
+            'address' => $this->faker->streetAddress(),
             'building' => $this->faker->optional()->secondaryAddress(),
-            'detail' => $this->faker->realText(),
+            'detail' => $this->faker->text(60),
         ];
     }
 }
@@ -144,13 +159,13 @@ class ContactFactory extends Factory
 ### コード解説
 - `'category_id' => Category::factory()`: `Contact`モデルは`Category`モデルに属しているため、`Contact`を作成する際に、関連する`Category`も自動で作成するように定義しています。
 - `$this->faker->firstName()`: Fakerを使って、リアルな「名」を生成します。
-- `$this->faker->numerify('###########')`: ` #` をランダムな数字（0-9）に置き換えます。ここでは11桁の電話番号を生成しています。
+- `$this->faker->numerify('0##########')`: ` #` をランダムな数字（0-9）に置き換えます。先頭の`0`を固定し、残り10桁をランダムにして11桁の電話番号を生成しています。
 - `$this->faker->optional()->secondaryAddress()`: 50%の確率で`null`を、そうでなければ建物の部屋番号などを生成します。`building`カラムが`nullable`な場合に対応できます。
 
 ### 4.3 TagFactory
 
 ```bash
-php artisan make:factory TagFactory --model=Tag
+sail artisan make:factory TagFactory --model=Tag
 ```
 
 作成された`database/factories/TagFactory.php`を以下のように編集します。
@@ -176,14 +191,14 @@ class TagFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => $this->faker->word(),
+            'name' => $this->faker->unique()->words(2, true),
         ];
     }
 }
 ```
 
 ### コード解説
-- `$this->faker->word()`: ランダムな一つの単語を生成します。
+- `$this->faker->unique()->words(2, true)`: ランダムな2つの単語を文字列として生成します。`unique()`を付けることで、複数のタグを生成した際に名前が重複しないようにしています。
 
 ## 5. 単体テスト (Unit Tests) の作成 🔬
 
@@ -196,7 +211,7 @@ class TagFactory extends Factory
 #### 5.1.1 Categoryモデルのテスト
 
 ```bash
-php artisan make:test Models/CategoryTest --unit
+sail artisan make:test Models/CategoryTest --unit
 ```
 
 作成された`tests/Unit/Models/CategoryTest.php`を以下のように編集します。
@@ -219,9 +234,9 @@ class CategoryTest extends TestCase
     public function test_category_has_many_contacts(): void
     {
         $category = Category::factory()->create();
-        Contact::factory()->for($category)->count(3)->create();
+        Contact::factory()->count(2)->for($category)->create();
 
-        $this->assertCount(3, $category->contacts);
+        $this->assertCount(2, $category->fresh()->contacts);
         $this->assertInstanceOf(Contact::class, $category->contacts->first());
     }
 }
@@ -231,14 +246,14 @@ class CategoryTest extends TestCase
 - `use RefreshDatabase;`: このトレイトを使用すると、各テストメソッドの実行前にデータベースがマイグレーションされ、実行後にロールバックされます。これにより、他のテストの影響を受けないクリーンな状態でテストを実行できます。
 - `test_category_has_many_contacts()`: `Category`モデルが`contacts`リレーション（一対多）を正しく持っているかをテストします。
 - `$category = Category::factory()->create();`: テスト対象のカテゴリを1つ作成します。
-- `Contact::factory()->for($category)->count(3)->create();`: 作成したカテゴリに属するお問い合わせを3つ作成します。
-- `$this->assertCount(3, $category->contacts);`: `$category->contacts`（リレーション経由で取得したお問い合わせのコレクション）の件数が3件であることをアサート（断言）します。
+- `Contact::factory()->count(2)->for($category)->create();`: 作成したカテゴリに属するお問い合わせを2つ作成します。
+- `$this->assertCount(2, $category->fresh()->contacts);`: `fresh()`でデータベースからモデルを再取得し、`contacts`リレーション経由で取得したお問い合わせのコレクションの件数が2件であることをアサート（断言）します。
 - `$this->assertInstanceOf(Contact::class, $category->contacts->first());`: コレクションの最初の要素が`Contact`クラスのインスタンスであることをアサートし、リレーションが正しいモデルを返していることを確認します。
 
 #### 5.1.2 Contactモデルのテスト
 
 ```bash
-php artisan make:test Models/ContactTest --unit
+sail artisan make:test Models/ContactTest --unit
 ```
 
 作成された`tests/Unit/Models/ContactTest.php`を以下のように編集します。
@@ -259,12 +274,11 @@ class ContactTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_contact_belongs_to_a_category(): void
+    public function test_contact_belongs_to_category(): void
     {
         $category = Category::factory()->create();
         $contact = Contact::factory()->for($category)->create();
 
-        $this->assertInstanceOf(Category::class, $contact->category);
         $this->assertTrue($contact->category->is($category));
     }
 
@@ -272,24 +286,29 @@ class ContactTest extends TestCase
     {
         $contact = Contact::factory()->create();
         $tags = Tag::factory()->count(2)->create();
-        $contact->tags()->attach($tags);
+
+        $contact->tags()->attach($tags->pluck('id'));
+
+        $contact->load('tags');
 
         $this->assertCount(2, $contact->tags);
-        $this->assertInstanceOf(Tag::class, $contact->tags->first());
+        $this->assertTrue($contact->tags->pluck('id')->contains($tags->first()->id));
     }
 }
 ```
 
 #### コード解説
-- `test_contact_belongs_to_a_category()`: `Contact`モデルが`category`リレーション（多対一）を正しく持っているかをテストします。
+- `test_contact_belongs_to_category()`: `Contact`モデルが`category`リレーション（多対一）を正しく持っているかをテストします。
 - `$this->assertTrue($contact->category->is($category));`: 2つのモデルインスタンスが同じ（同じ主キーを持つ同じテーブルのレコード）であるかをアサートします。
 - `test_contact_belongs_to_many_tags()`: `Contact`モデルが`tags`リレーション（多対多）を正しく持っているかをテストします。
-- `$contact->tags()->attach($tags);`: `Contact`に複数の`Tag`を紐付けます。
+- `$contact->tags()->attach($tags->pluck('id'));`: `Contact`に複数の`Tag`のIDを紐付けます。`pluck('id')`でIDの配列を取得しています。
+- `$contact->load('tags');`: リレーションを明示的に再読み込みし、最新の状態を取得します。
+- `$this->assertTrue($contact->tags->pluck('id')->contains($tags->first()->id));`: タグのIDコレクションに、紐付けたタグのIDが含まれていることを確認します。
 
 #### 5.1.3 Tagモデルのテスト
 
 ```bash
-php artisan make:test Models/TagTest --unit
+sail artisan make:test Models/TagTest --unit
 ```
 
 作成された`tests/Unit/Models/TagTest.php`を以下のように編集します。
@@ -312,11 +331,14 @@ class TagTest extends TestCase
     public function test_tag_belongs_to_many_contacts(): void
     {
         $tag = Tag::factory()->create();
-        $contacts = Contact::factory()->count(3)->create();
-        $tag->contacts()->attach($contacts);
+        $contacts = Contact::factory()->count(2)->create();
 
-        $this->assertCount(3, $tag->contacts);
-        $this->assertInstanceOf(Contact::class, $tag->contacts->first());
+        $tag->contacts()->attach($contacts->pluck('id')->toArray());
+
+        $tag->load('contacts');
+
+        $this->assertCount(2, $tag->contacts);
+        $this->assertTrue($tag->contacts->pluck('id')->contains($contacts->first()->id));
     }
 }
 ```
@@ -331,7 +353,7 @@ class TagTest extends TestCase
 #### 5.2.1 StoreContactRequestのテスト
 
 ```bash
-php artisan make:test Requests/StoreContactRequestTest --unit
+sail artisan make:test Requests/StoreContactRequestTest --unit
 ```
 
 作成された`tests/Unit/Requests/StoreContactRequestTest.php`を以下のように編集します。
@@ -357,7 +379,7 @@ class StoreContactRequestTest extends TestCase
     {
         $request = new StoreContactRequest();
 
-        return Validator::make($data, $request->rules());
+        return Validator::make($data, $request->rules(), $request->messages());
     }
 
     private function basePayload(Category $category, array $overrides = []): array
@@ -410,7 +432,7 @@ class StoreContactRequestTest extends TestCase
 #### 5.2.2 IndexContactRequestのテスト
 
 ```bash
-php artisan make:test Requests/IndexContactRequestTest --unit
+sail artisan make:test Requests/IndexContactRequestTest --unit
 ```
 
 作成された`tests/Unit/Requests/IndexContactRequestTest.php`を以下のように編集します。
@@ -468,7 +490,7 @@ class IndexContactRequestTest extends TestCase
 #### 5.2.3 ExportContactRequestのテスト
 
 ```bash
-php artisan make:test ExportContactRequestTest --unit
+sail artisan make:test ExportContactRequestTest --unit
 ```
 
 作成された`tests/Unit/ExportContactRequestTest.php`を以下のように編集します。
@@ -544,7 +566,7 @@ class ExportContactRequestTest extends TestCase
 #### 5.2.4 StoreTagRequestのテスト
 
 ```bash
-php artisan make:test Requests/StoreTagRequestTest --unit
+sail artisan make:test Requests/StoreTagRequestTest --unit
 ```
 
 作成された`tests/Unit/Requests/StoreTagRequestTest.php`を以下のように編集します。
@@ -579,6 +601,22 @@ class StoreTagRequestTest extends TestCase
         $this->assertTrue($validator->passes());
     }
 
+    public function test_rules_reject_empty_name(): void
+    {
+        $validator = $this->validator(['name' => '']);
+
+        $this->assertTrue($validator->fails());
+        $this->assertArrayHasKey('name', $validator->errors()->messages());
+    }
+
+    public function test_rules_reject_name_exceeding_max_length(): void
+    {
+        $validator = $this->validator(['name' => str_repeat('a', 51)]);
+
+        $this->assertTrue($validator->fails());
+        $this->assertArrayHasKey('name', $validator->errors()->messages());
+    }
+
     public function test_rules_reject_duplicate_name(): void
     {
         Tag::factory()->create(['name' => 'duplicate']);
@@ -592,12 +630,14 @@ class StoreTagRequestTest extends TestCase
 ```
 
 #### コード解説
+- `test_rules_reject_empty_name()`: `name`が空の場合にバリデーションが失敗すること（`required`）をテストします。
+- `test_rules_reject_name_exceeding_max_length()`: `name`が50文字を超える場合にバリデーションが失敗すること（`max:50`）をテストします。
 - `test_rules_reject_duplicate_name()`: `name`に既に存在するタグ名が指定された場合にバリデーションが失敗すること（`unique:tags,name`）をテストします。
 
 #### 5.2.5 UpdateTagRequestのテスト
 
 ```bash
-php artisan make:test Requests/UpdateTagRequestTest --unit
+sail artisan make:test Requests/UpdateTagRequestTest --unit
 ```
 
 作成された`tests/Unit/Requests/UpdateTagRequestTest.php`を以下のように編集します。
@@ -663,7 +703,7 @@ class UpdateTagRequestTest extends TestCase
 #### 6.1.1 お問い合わせページのテスト
 
 ```bash
-php artisan make:test ContactPageTest
+sail artisan make:test ContactPageTest
 ```
 
 作成された`tests/Feature/ContactPageTest.php`を以下のように編集します。
@@ -727,7 +767,7 @@ class ContactPageTest extends TestCase
 #### 6.1.2 CSVエクスポート機能のテスト
 
 ```bash
-php artisan make:test ContactExportTest
+sail artisan make:test ContactExportTest
 ```
 
 作成された`tests/Feature/ContactExportTest.php`を以下のように編集します。
@@ -834,7 +874,7 @@ class ContactExportTest extends TestCase
 #### 6.2.1 お問い合わせコントローラーのテスト
 
 ```bash
-php artisan make:test ContactControllerTest
+sail artisan make:test ContactControllerTest
 ```
 
 作成された`tests/Feature/ContactControllerTest.php`を以下のように編集します。
@@ -846,6 +886,7 @@ php artisan make:test ContactControllerTest
 namespace Tests\Feature;
 
 use App\Models\Category;
+use App\Models\Contact;
 use App\Models\Tag;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -854,9 +895,48 @@ class ContactControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function validPayload(Category $category, array $overrides = []): array
+    public function test_confirm_displays_validated_data(): void
     {
-        return array_merge([
+        $category = Category::factory()->create(['content' => 'Support']);
+        $tags = Tag::factory()->count(2)->create();
+
+        $payload = [
+            'first_name' => 'Taro',
+            'last_name' => 'Yamada',
+            'gender' => 1,
+            'email' => 'taro@example.com',
+            'tel' => '09012345678',
+            'address' => 'Tokyo',
+            'building' => 'Sunshine 60',
+            'category_id' => $category->id,
+            'detail' => 'テスト内容',
+            'tag_ids' => $tags->pluck('id')->toArray(),
+        ];
+
+        $response = $this->post('/contacts/confirm', $payload);
+
+        $response->assertOk();
+        $response->assertViewIs('contact.confirm');
+        $response->assertSee('Taro');
+        $response->assertSee('Yamada');
+        $response->assertSee('taro@example.com');
+        $response->assertSee('Support');
+    }
+
+    public function test_confirm_validation_error_redirects_back(): void
+    {
+        $response = $this->post('/contacts/confirm', []);
+
+        $response->assertRedirect();
+        $response->assertSessionHasErrors(['first_name', 'last_name', 'email', 'tel', 'address', 'category_id', 'detail']);
+    }
+
+    public function test_store_persists_contact_and_redirects_to_thanks(): void
+    {
+        $category = Category::factory()->create();
+        $tags = Tag::factory()->count(2)->create();
+
+        $payload = [
             'first_name' => 'Taro',
             'last_name' => 'Yamada',
             'gender' => 1,
@@ -866,48 +946,25 @@ class ContactControllerTest extends TestCase
             'building' => 'Sunshine 60',
             'category_id' => $category->id,
             'detail' => 'お問い合わせ内容です',
-        ], $overrides);
-    }
-
-    public function test_confirm_displays_validated_data(): void
-    {
-        $category = Category::factory()->create();
-        $tags = Tag::factory()->count(2)->create();
-
-        $payload = $this->validPayload($category, [
             'tag_ids' => $tags->pluck('id')->toArray(),
-        ]);
-
-        $response = $this->post('/contacts/confirm', $payload);
-
-        $response->assertOk();
-        $response->assertViewIs('contact.confirm');
-    }
-
-    public function test_confirm_validation_error_redirects_back(): void
-    {
-        $response = $this->post('/contacts/confirm', []);
-
-        $response->assertRedirect();
-        $response->assertSessionHasErrors();
-    }
-
-    public function test_store_persists_contact_and_redirects_to_thanks(): void
-    {
-        $category = Category::factory()->create();
-        $tags = Tag::factory()->count(2)->create();
-
-        $payload = $this->validPayload($category, [
-            'tag_ids' => $tags->pluck('id')->toArray(),
-        ]);
+        ];
 
         $response = $this->post('/contacts', $payload);
 
         $response->assertRedirect('/thanks');
+
         $this->assertDatabaseHas('contacts', [
             'email' => 'taro@example.com',
             'category_id' => $category->id,
         ]);
+
+        $contact = Contact::where('email', 'taro@example.com')->first();
+        foreach ($tags as $tag) {
+            $this->assertDatabaseHas('contact_tag', [
+                'contact_id' => $contact->id,
+                'tag_id' => $tag->id,
+            ]);
+        }
     }
 
     public function test_store_validation_error_redirects_back(): void
@@ -915,28 +972,29 @@ class ContactControllerTest extends TestCase
         $response = $this->post('/contacts', []);
 
         $response->assertRedirect();
-        $response->assertSessionHasErrors();
+        $response->assertSessionHasErrors(['first_name', 'last_name', 'email', 'tel', 'address', 'category_id', 'detail']);
     }
 }
 ```
 
 #### コード解説
-- `validPayload()`: テストで使用する有効なフォームデータを生成するヘルパーメソッドです。`$overrides`で一部のデータを上書きできます。
 - `test_confirm_displays_validated_data()`: 確認画面へのPOSTリクエストが成功し、`contact.confirm`ビューが表示されることをテストします。
   - `$this->post('/contacts/confirm', $payload)`: 確認画面のURLにPOSTリクエストを送信します。
   - `$response->assertViewIs('contact.confirm')`: 確認画面のビューが返されたことを確認します。
+  - `$response->assertSee('Taro')`, `assertSee('Yamada')` 等: 送信したデータが確認画面に表示されていることを確認します。
 - `test_confirm_validation_error_redirects_back()`: 空のデータで確認画面にPOSTした場合、バリデーションエラーで元の画面にリダイレクトされることをテストします。
-  - `$response->assertSessionHasErrors()`: セッションにバリデーションエラーが存在することをアサートします。
+  - `$response->assertSessionHasErrors([...])`: セッションに特定のフィールドのバリデーションエラーが存在することをアサートします。
 - `test_store_persists_contact_and_redirects_to_thanks()`: お問い合わせデータの保存が成功し、サンクスページにリダイレクトされることをテストします。
   - `$this->post('/contacts', $payload)`: お問い合わせ保存のURLにPOSTリクエストを送信します。
   - `$response->assertRedirect('/thanks')`: サンクスページへリダイレクトされることを確認します。
   - `$this->assertDatabaseHas('contacts', ...)`: データベースにお問い合わせデータが保存されたことを確認します。
+  - `$this->assertDatabaseHas('contact_tag', ...)`: 中間テーブルにタグの紐付けが保存されたことを確認します。
 - `test_store_validation_error_redirects_back()`: 空のデータで保存を試みた場合、バリデーションエラーでリダイレクトされることをテストします。
 
 #### 6.2.2 管理画面コントローラーのテスト
 
 ```bash
-php artisan make:test AdminControllerTest
+sail artisan make:test AdminControllerTest
 ```
 
 作成された`tests/Feature/AdminControllerTest.php`を以下のように編集します。
@@ -949,7 +1007,9 @@ namespace Tests\Feature;
 
 use App\Models\Category;
 use App\Models\Contact;
+use App\Models\Tag;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -961,69 +1021,75 @@ class AdminControllerTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $response = $this->actingAs($user)->get("/admin");
+        $response = $this->actingAs($user)->get('/admin');
 
         $response->assertOk();
-        $response->assertViewIs("admin.index");
-        $response->assertViewHas("contacts");
+        $response->assertViewIs('admin.index');
     }
 
     public function test_unauthenticated_user_is_redirected_to_login(): void
     {
-        $response = $this->get("/admin");
+        $response = $this->get('/admin');
 
-        $response->assertRedirect("/login");
+        $response->assertRedirect('/login');
     }
 
     public function test_index_displays_contacts_with_filter(): void
     {
         $user = User::factory()->create();
-        $category = Category::factory()->create(["content" => "Delivery"]);
+        $category = Category::factory()->create(['content' => 'Delivery']);
 
-        Contact::factory()->for($category)->create([
-            "first_name" => "Ken",
-            "last_name" => "Ito",
-            "gender" => 1,
-            "email" => "ken@example.com",
+        $matching = Contact::factory()->for($category)->create([
+            'first_name' => 'Ken',
+            'last_name' => 'Ito',
+            'gender' => 1,
+            'email' => 'ken@example.com',
+            'created_at' => Carbon::parse('2024-02-01 09:00:00'),
         ]);
 
         Contact::factory()->create([
-            "first_name" => "Jane",
-            "last_name" => "Smith",
-            "gender" => 2,
-            "email" => "jane@example.com",
+            'first_name' => 'Jane',
+            'last_name' => 'Smith',
+            'gender' => 2,
+            'email' => 'jane@example.com',
+            'created_at' => Carbon::parse('2024-02-02 09:00:00'),
         ]);
 
-        $response = $this->actingAs($user)->get("/admin?keyword=Ken");
+        $response = $this->actingAs($user)->get('/admin?keyword=Ken&gender=1&category_id=' . $category->id . '&date=2024-02-01');
 
         $response->assertOk();
-        $response->assertSee("Ken");
+        $response->assertSee('Ken');
+        $response->assertDontSee('Jane');
     }
 
     public function test_index_paginates_results(): void
     {
         $user = User::factory()->create();
-        Contact::factory()->count(20)->create();
+        Contact::factory()->count(10)->create();
 
-        $response = $this->actingAs($user)->get("/admin");
+        $response = $this->actingAs($user)->get('/admin');
 
         $response->assertOk();
-        $response->assertViewHas("contacts");
+        $response->assertViewHas('contacts');
+        $this->assertEquals(7, $response->viewData('contacts')->count());
     }
 
     public function test_show_displays_contact_detail(): void
     {
         $user = User::factory()->create();
-        $contact = Contact::factory()->create([
-            "first_name" => "Mika",
-            "last_name" => "Suzuki",
+        $category = Category::factory()->create(['content' => 'Support']);
+        $contact = Contact::factory()->for($category)->create([
+            'first_name' => 'Mika',
+            'last_name' => 'Suzuki',
         ]);
 
-        $response = $this->actingAs($user)->get("/admin/" . $contact->id);
+        $response = $this->actingAs($user)->get('/admin/contacts/' . $contact->id);
 
         $response->assertOk();
-        $response->assertSee("Mika");
-        $response->assertSee("Suzuki");
+        $response->assertViewIs('admin.show');
+        $response->assertSee('Mika');
+        $response->assertSee('Suzuki');
+        $response->assertSee('Support');
     }
 
     public function test_destroy_removes_contact_and_redirects(): void
@@ -1031,35 +1097,36 @@ class AdminControllerTest extends TestCase
         $user = User::factory()->create();
         $contact = Contact::factory()->create();
 
-        $response = $this->actingAs($user)->delete("/admin/" . $contact->id);
+        $response = $this->actingAs($user)->delete('/admin/contacts/' . $contact->id);
 
-        $response->assertRedirect("/admin");
-        $this->assertDatabaseMissing("contacts", [
-            "id" => $contact->id,
-        ]);
+        $response->assertRedirect('/admin');
+        $this->assertDatabaseMissing('contacts', ['id' => $contact->id]);
     }
 }
 ```
 
 #### コード解説
 - `test_authenticated_user_can_view_admin_dashboard()`: 認証済みのユーザーが`/admin`にアクセスし、`admin.index`ビューが返されることをテストしています。
-  - `$this->actingAs($user)->get("/admin")`: `actingAs()`で指定したユーザーとしてログインした状態でリクエストを送信します。
-  - `$response->assertViewHas("contacts")`: ビューに`contacts`変数が渡されていることを確認します。コントローラーがお問い合わせデータを正しくビューに渡しているかを検証します。
+  - `$this->actingAs($user)->get('/admin')`: `actingAs()`で指定したユーザーとしてログインした状態でリクエストを送信します。
 - `test_unauthenticated_user_is_redirected_to_login()`: 未認証のユーザーが`/admin`にアクセスした場合、ログインページにリダイレクトされることをテストします。
   - `$response->assertRedirect("/login")`: `/login`へのリダイレクトが発生したことをアサートします。認証ミドルウェアが正しく機能していることを確認できます。
-- `test_index_displays_contacts_with_filter()`: キーワードフィルタを指定して管理画面にアクセスし、検索結果が正しく表示されることをテストします。
-  - `$response->assertSee("Ken")`: レスポンスのHTML内に指定した文字列が含まれていることをアサートします。
-- `test_index_paginates_results()`: 大量のデータが存在する場合にページネーションが正しく動作することをテストします。
-- `test_show_displays_contact_detail()`: 個別のお問い合わせ詳細画面が正しく表示されることをテストします。
+- `test_index_displays_contacts_with_filter()`: キーワード・性別・カテゴリ・日付の全フィルタを指定して管理画面にアクセスし、検索結果が正しく表示されることをテストします。
+  - `$response->assertSee('Ken')`: レスポンスのHTML内に指定した文字列が含まれていることをアサートします。
+  - `$response->assertDontSee('Jane')`: フィルタ条件に合致しないデータが表示されていないことを確認します。
+- `test_index_paginates_results()`: 10件のデータを作成し、ページネーションで1ページ目に7件が表示されることをテストします。
+  - `$this->assertEquals(7, $response->viewData('contacts')->count())`: ビューに渡されたコレクションの件数を検証します。
+- `test_show_displays_contact_detail()`: 個別のお問い合わせ詳細画面が正しく表示されることをテストします。`/admin/contacts/{id}`のURLでアクセスします。
+  - `$response->assertViewIs('admin.show')`: 正しいビューが返されることを確認します。
+  - `$response->assertSee('Support')`: カテゴリ名が画面に表示されていることを確認します。
 - `test_destroy_removes_contact_and_redirects()`: お問い合わせの削除が成功し、管理画面にリダイレクトされることをテストします。
-  - `$this->actingAs($user)->delete("/admin/" . $contact->id)`: DELETEリクエストを送信してお問い合わせを削除します。
-  - `$response->assertRedirect("/admin")`: 削除後に管理画面にリダイレクトされることを確認します。
-  - `$this->assertDatabaseMissing("contacts", ...)`: データベースからお問い合わせデータが正しく削除されたことを確認します。
+  - `$this->actingAs($user)->delete('/admin/contacts/' . $contact->id)`: DELETEリクエストを送信してお問い合わせを削除します。
+  - `$response->assertRedirect('/admin')`: 削除後に管理画面にリダイレクトされることを確認します。
+  - `$this->assertDatabaseMissing('contacts', ...)`: データベースからお問い合わせデータが正しく削除されたことを確認します。
 
 #### 6.2.3 タグコントローラーのテスト
 
 ```bash
-php artisan make:test TagControllerTest
+sail artisan make:test TagControllerTest
 ```
 
 作成された`tests/Feature/TagControllerTest.php`を以下のように編集します。
@@ -1083,21 +1150,21 @@ class TagControllerTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $response = $this->actingAs($user)->post("/tags", ["name" => "priority"]);
+        $response = $this->actingAs($user)->post('/admin/tags', ['name' => 'priority']);
 
-        $response->assertRedirect();
-        $this->assertDatabaseHas("tags", ["name" => "priority"]);
+        $response->assertRedirect('/admin');
+        $this->assertDatabaseHas('tags', ['name' => 'priority']);
     }
 
     public function test_authenticated_user_can_update_tag(): void
     {
         $user = User::factory()->create();
-        $tag = Tag::factory()->create(["name" => "initial"]);
+        $tag = Tag::factory()->create(['name' => 'initial']);
 
-        $response = $this->actingAs($user)->put("/tags/" . $tag->id, ["name" => "updated"]);
+        $response = $this->actingAs($user)->put('/admin/tags/' . $tag->id, ['name' => 'updated']);
 
-        $response->assertRedirect();
-        $this->assertDatabaseHas("tags", ["id" => $tag->id, "name" => "updated"]);
+        $response->assertRedirect('/admin');
+        $this->assertDatabaseHas('tags', ['id' => $tag->id, 'name' => 'updated']);
     }
 
     public function test_authenticated_user_can_delete_tag(): void
@@ -1105,35 +1172,34 @@ class TagControllerTest extends TestCase
         $user = User::factory()->create();
         $tag = Tag::factory()->create();
 
-        $response = $this->actingAs($user)->delete("/tags/" . $tag->id);
+        $response = $this->actingAs($user)->delete('/admin/tags/' . $tag->id);
 
-        $response->assertRedirect();
-        $this->assertDatabaseMissing("tags", ["id" => $tag->id]);
+        $response->assertRedirect('/admin');
+        $this->assertDatabaseMissing('tags', ['id' => $tag->id]);
     }
 
     public function test_unauthenticated_user_cannot_create_tag(): void
     {
-        $response = $this->post("/tags", ["name" => "unauthorized"]);
+        $response = $this->post('/admin/tags', ['name' => 'priority']);
 
-        $response->assertRedirect("/login");
-        $this->assertDatabaseMissing("tags", ["name" => "unauthorized"]);
+        $response->assertRedirect('/login');
     }
 }
 ```
 
 #### コード解説
 - `test_authenticated_user_can_create_tag()`: 認証済みのユーザーがタグを作成できることをテストします。
-  - `$this->actingAs($user)->post("/tags", ["name" => "priority"])`: ログイン状態でPOSTリクエストを送信し、タグを作成します。
-  - `$this->assertDatabaseHas("tags", ["name" => "priority"])`: データベースに新しいタグが保存されたことを確認します。
+  - `$this->actingAs($user)->post('/admin/tags', ['name' => 'priority'])`: ログイン状態でPOSTリクエストを送信し、タグを作成します。
+  - `$response->assertRedirect('/admin')`: 作成後に管理画面にリダイレクトされることを確認します。
+  - `$this->assertDatabaseHas('tags', ['name' => 'priority'])`: データベースに新しいタグが保存されたことを確認します。
 - `test_authenticated_user_can_update_tag()`: 認証済みのユーザーがタグ名を更新できることをテストします。
-  - `$this->actingAs($user)->put("/tags/" . $tag->id, ["name" => "updated"])`: PUTリクエストでタグを更新します。
-  - `$this->assertDatabaseHas("tags", ["id" => $tag->id, "name" => "updated"])`: データベースのタグ名が正しく更新されたことを確認します。
+  - `$this->actingAs($user)->put('/admin/tags/' . $tag->id, ['name' => 'updated'])`: PUTリクエストでタグを更新します。
+  - `$this->assertDatabaseHas('tags', ['id' => $tag->id, 'name' => 'updated'])`: データベースのタグ名が正しく更新されたことを確認します。
 - `test_authenticated_user_can_delete_tag()`: 認証済みのユーザーがタグを削除できることをテストします。
-  - `$this->actingAs($user)->delete("/tags/" . $tag->id)`: DELETEリクエストでタグを削除します。
-  - `$this->assertDatabaseMissing("tags", ["id" => $tag->id])`: データベースからタグが削除されたことを確認します。
-- `test_unauthenticated_user_cannot_create_tag()`: 未認証のユーザーがタグを作成しようとした場合、ログインページにリダイレクトされ、タグは作成されないことをテストします。
-  - `$response->assertRedirect("/login")`: 認証ミドルウェアによりログインページにリダイレクトされることを確認します。
-  - `$this->assertDatabaseMissing("tags", ["name" => "unauthorized"])`: 未認証のリクエストではタグが保存されないことを保証します。
+  - `$this->actingAs($user)->delete('/admin/tags/' . $tag->id)`: DELETEリクエストでタグを削除します。
+  - `$this->assertDatabaseMissing('tags', ['id' => $tag->id])`: データベースからタグが削除されたことを確認します。
+- `test_unauthenticated_user_cannot_create_tag()`: 未認証のユーザーがタグを作成しようとした場合、ログインページにリダイレクトされることをテストします。
+  - `$response->assertRedirect('/login')`: 認証ミドルウェアによりログインページにリダイレクトされることを確認します。
 
 > **💡 SSRアプリケーションにおけるテストのポイント**
 >
@@ -1154,7 +1220,7 @@ class TagControllerTest extends TestCase
 全てのテストコードを書き終えたら、いよいよ実行です。以下のコマンドをターミナルで実行してください。
 
 ```bash
-php artisan test
+sail artisan test
 ```
 
 このコマンドは、`tests`ディレクトリ配下の全てのテストを自動で検出し、実行します。
@@ -1171,7 +1237,7 @@ php artisan test
    ✓ category has many contacts
 
    PASS  Tests\Unit\Models\ContactTest
-   ✓ contact belongs to a category
+   ✓ contact belongs to category
    ✓ contact belongs to many tags
 
    PASS  Tests\Unit\Models\TagTest
@@ -1187,6 +1253,8 @@ php artisan test
 
    PASS  Tests\Unit\Requests\StoreTagRequestTest
    ✓ rules accept valid name
+   ✓ rules reject empty name
+   ✓ rules reject name exceeding max length
    ✓ rules reject duplicate name
 
    PASS  Tests\Unit\Requests\UpdateTagRequestTest

@@ -29,7 +29,7 @@ class StoreContactRequest extends FormRequest
             'tel' => ['required', 'string', 'regex:/^[0-9]{10,11}$/'],
             'address' => ['required', 'string', 'max:255'],
             'building' => ['nullable', 'string', 'max:255'],
-            'category_id' => ['required', 'exists:categories,id'],
+            'category_id' => ['required', 'integer', 'exists:categories,id'],
             'detail' => ['required', 'string', 'max:120'],
             'tag_ids' => ['nullable', 'array'],
             'tag_ids.*' => ['integer', 'exists:tags,id'],

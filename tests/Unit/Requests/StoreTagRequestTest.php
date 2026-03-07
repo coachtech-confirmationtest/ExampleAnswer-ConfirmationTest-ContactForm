@@ -25,6 +25,22 @@ class StoreTagRequestTest extends TestCase
         $this->assertTrue($validator->passes());
     }
 
+    public function test_rules_reject_empty_name(): void
+    {
+        $validator = $this->validator(['name' => '']);
+
+        $this->assertTrue($validator->fails());
+        $this->assertArrayHasKey('name', $validator->errors()->messages());
+    }
+
+    public function test_rules_reject_name_exceeding_max_length(): void
+    {
+        $validator = $this->validator(['name' => str_repeat('a', 51)]);
+
+        $this->assertTrue($validator->fails());
+        $this->assertArrayHasKey('name', $validator->errors()->messages());
+    }
+
     public function test_rules_reject_duplicate_name(): void
     {
         Tag::factory()->create(['name' => 'duplicate']);
