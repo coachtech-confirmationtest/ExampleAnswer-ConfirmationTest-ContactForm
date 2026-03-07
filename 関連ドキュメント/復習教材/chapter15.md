@@ -19,32 +19,25 @@ Laravelのテストは、大きく分けて2種類あります。
 
 テストを実行する前に、テスト専用のデータベース設定を行います。これにより、開発用のデータベースを汚すことなく、安全にテストを実行できます。
 
-プロジェクトのルートにある`phpunit.xml`ファイルを開き、`<php>`セクションに以下の`<env>`変数を追加または確認してください。
+プロジェクトのルートにある`phpunit.xml`ファイルを開き、`<php>`セクション内の`DB_DATABASE`の行を変更し、`DB_CONNECTION`の行を追加してください。
 
-**phpunit.xml**
+**phpunit.xml（`<php>`セクション内の変更箇所）**
 ```xml
-<phpunit ...>
-    <testsuites>
-        ...
-    </testsuites>
-    <source>
-        ...
-    </source>
     <php>
         <env name="APP_ENV" value="testing"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_DRIVER" value="array"/>
-        <!-- <env name="DB_CONNECTION" value="sqlite"/> -->
-        <!-- <env name="DB_DATABASE" value=":memory:"/> -->
-        <env name="DB_CONNECTION" value="mysql"/>
-        <env name="DB_DATABASE" value="contact_form_test"/>
+        <env name="DB_CONNECTION" value="mysql"/>           <!-- 追加 -->
+        <env name="DB_DATABASE" value="contact_form_test"/> <!-- 変更: "testing" → "contact_form_test" -->
         <env name="MAIL_MAILER" value="array"/>
+        <env name="PULSE_ENABLED" value="false"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
     </php>
-</phpunit>
 ```
+
+> **変更のポイント**: デフォルトでは `DB_DATABASE` が `"testing"` になっていますが、これを `"contact_form_test"` に変更します。また、`DB_CONNECTION` の行はデフォルトでは存在しないため、新規に追加してください。
 
 ### コード解説
 - `<env name="APP_ENV" value="testing"/>`: Laravelに、現在の環境がテスト環境であることを伝えます。
