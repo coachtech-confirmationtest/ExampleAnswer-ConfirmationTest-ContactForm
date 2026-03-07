@@ -341,7 +341,17 @@ D. コードの解説
 - 最後に「この設計が失敗しやすい例」を3つ出す
 ```
 
-## 7. まとめ ✨
+## 7. 動作確認 🔍
+
+マイグレーションが正しく実行されたか、phpMyAdmin（`http://localhost:8080`）で以下を確認してください。
+
+1. `categories`テーブルが作成されていること
+   - カラム: `id`, `content`, `created_at`, `updated_at`
+2. `contacts`テーブルが作成されていること
+   - カラム: `id`, `category_id`, `first_name`, `last_name`, `gender`, `email`, `tel`, `address`, `building`(NULL許容), `detail`, `created_at`, `updated_at`
+   - `category_id`に外部キー制約が設定されていること
+
+## 8. まとめ ✨
 
 このチャプターでは、Laravelのマイグレーション機能を使って、アプリケーションの土台となるデータベースのテーブルを作成しました。
 
