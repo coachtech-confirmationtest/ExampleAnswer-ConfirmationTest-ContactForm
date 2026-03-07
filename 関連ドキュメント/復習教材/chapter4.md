@@ -204,24 +204,16 @@ Schema::create("users", function (Blueprint $table) {
 sail artisan migrate:fresh
 ```
 
-### 4.7. ルートの保護
+### 4.7. 動作確認
 
-最後に、管理画面（`/admin`）へのルートを`auth`ミドルウェアで保護します。`routes/web.php`を開き、以下のようにルートをグループ化します。
+これで認証機能の実装は完了です。以下の動作を確認してください。
 
-```php
-// routes/web.php
+1. `/register`にアクセスし、新規ユーザー登録ができること
+2. 登録後、自動的にログイン状態になり`/admin`にリダイレクトされること（※この時点では`AdminController`が未作成のためエラー画面が表示されますが、URLが`/admin`に遷移していれば正常です）
+3. `/logout`でログアウトできること（ヘッダーのlogoutボタンを押下）
+4. `/login`から登録した情報でログインできること
 
-use App\Http\Controllers\AdminController;
-
-// ... 他のuse文
-
-Route::middleware("auth")->group(function () {
-    Route::get("/admin", [AdminController::class, "index"]);
-    // 今後追加する管理画面のルートもこの中に追加する
-});
-```
-
-これで実装は完了です。`/register`にアクセスしてユーザー登録を行い、`/login`でログインした後、`/admin`にアクセスできること、ログアウト後に`/admin`にアクセスすると`/login`にリダイレクトされることを確認してください。
+管理画面（`/admin`）のルート定義と`auth`ミドルウェアによるアクセス制御は、コントローラーとルーティングを実装するチャプター（Chapter 8〜9）で行います。
 
 ## 5. コードの詳細解説 🔍
 
