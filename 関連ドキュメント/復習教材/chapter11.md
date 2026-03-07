@@ -158,6 +158,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
+            UserSeeder::class,
             CategorySeeder::class,
             TagSeeder::class, // ここに追加
             ContactSeeder::class,
