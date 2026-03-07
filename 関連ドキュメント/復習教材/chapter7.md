@@ -36,23 +36,25 @@ ContactController       ContactController       ContactController
   @index                  @confirm                @store
     |                       |                       |
     | $categories           | $validated            | Contact::create()
-    | $tags                 | $category             | $contact->tags()->attach()
-    v                       | $tags                 |
-contact.index               v                       v
-  └─ _form.blade.php   contact.confirm         redirect('/thanks')
+    |                       | $category             |
+    v                       v                       |
+contact.index           contact.confirm         redirect('/thanks')
+  └─ _form.blade.php
 
   ← Chapter 8 で実装 →  ← 提供済みBlade（このチャプターで読み解く）→
 ```
 
 ### 入力画面（`contact.index`）のBlade
 
-- コントローラーから `$categories`（カテゴリー一覧）と `$tags`（タグ一覧）を受け取る想定。
-- `@foreach` で `<select>` 要素と `<input type="checkbox">` を動的に生成する。
+- コントローラーから `$categories`（カテゴリー一覧）を受け取る想定。
+- `@foreach` で `<select>` 要素を動的に生成する。
+- タグ関連の表示は `@isset($tags)` で囲まれており、応用機能フェーズ（Chapter 13）で `$tags` を渡すまでは非表示になる。
 - `old()` でバリデーションエラー時の入力値を復元する。
 
 ### 確認画面（`contact.confirm`）のBlade
 
-- コントローラーから `$validated`（バリデーション済みデータ）、`$category`（カテゴリーモデル）、`$tags`（タグコレクション）を受け取る想定。
+- コントローラーから `$validated`（バリデーション済みデータ）、`$category`（カテゴリーモデル）を受け取る想定。
+- タグ関連の表示は `@isset($tags)` で囲まれており、応用機能フェーズで `$tags` を渡すまでは非表示になる。
 - 入力内容を表示しつつ、`<input type="hidden">` で全データを保持し、最終送信に備える。
 
 ## 3. 先輩エンジニアの思考プロセス 💭
@@ -61,7 +63,7 @@ contact.index               v                       v
 
 ### Point 1: Bladeの`@foreach`でHTMLを動的に生成する
 
-カテゴリーやタグの選択肢は、データベースに格納されている動的なデータです。これをHTMLにハードコーディングしてしまうと、カテゴリーやタグが追加・変更されるたびにBladeファイルを手動で修正する必要があり、保守性が著しく低下します。`@foreach`ディレクティブを使ってモデルのコレクションをループ処理することで、データベースの内容が変わっても自動的にフォームの選択肢が更新されます。これにより、「データの変更はデータベースの管理だけで完結する」という理想的な状態を実現できます。
+カテゴリーの選択肢は、データベースに格納されている動的なデータです。これをHTMLにハードコーディングしてしまうと、カテゴリーが追加・変更されるたびにBladeファイルを手動で修正する必要があり、保守性が著しく低下します。`@foreach`ディレクティブを使ってモデルのコレクションをループ処理することで、データベースの内容が変わっても自動的にフォームの選択肢が更新されます。これにより、「データの変更はデータベースの管理だけで完結する」という理想的な状態を実現できます。なお、タグの選択肢も同じ仕組みですが、タグ機能は応用機能フェーズ（Chapter 13）で実装します。
 
 ### Point 2: `old()`でバリデーションエラー後の入力値を復元する
 
@@ -73,7 +75,7 @@ contact.index               v                       v
 
 ### Point 4: IDだけでなく「表示用データ」もビューに渡す
 
-確認画面では、ユーザーが選択したカテゴリーやタグの「名前」を表示する必要があります。しかし、フォームから送られてくるのは`category_id`や`tag_ids`というIDの値だけです。そのため、コントローラー側でIDからモデルを取得して名前を表示用に渡し、hidden inputにはIDを保持するという「表示用のデータ」と「送信用のデータ」の分離が重要になります。この仕組みはChapter 8のコントローラー実装で実現しますが、Blade側の構造を先に理解しておくことで、コントローラーが何を渡せばよいかが明確になります。
+確認画面では、ユーザーが選択したカテゴリーの「名前」を表示する必要があります。しかし、フォームから送られてくるのは`category_id`というIDの値だけです。そのため、コントローラー側でIDからモデルを取得して名前を表示用に渡し、hidden inputにはIDを保持するという「表示用のデータ」と「送信用のデータ」の分離が重要になります。この仕組みはChapter 8のコントローラー実装で実現しますが、Blade側の構造を先に理解しておくことで、コントローラーが何を渡せばよいかが明確になります。なお、タグのID→名前変換も同じ考え方で、応用機能フェーズ（Chapter 13）で実装します。
 
 ## 4. 提供Bladeファイルの読み解き 📖
 
@@ -143,6 +145,7 @@ contact.index               v                       v
 #### タグのチェックボックス
 
 ```blade
+@isset($tags)
 <div class="flex flex-wrap gap-4 py-3">
     @foreach ($tags as $tag)
         <label class="flex items-center cursor-pointer">
@@ -152,8 +155,10 @@ contact.index               v                       v
         </label>
     @endforeach
 </div>
+@endisset
 ```
 
+- **`@isset($tags)` / `@endisset`**: `$tags` 変数がコントローラーから渡されている場合のみ、タグセクションを表示します。基礎機能フェーズでは `$tags` を渡さないため非表示になり、応用機能フェーズ（Chapter 13）でタグ機能を実装した後に表示されるようになります。
 - **`name="tag_ids[]"`**: `[]` を付けることで、複数選択された値が**配列**としてサーバーに送信されます。これがないと最後の1つしか送信されません。
 - **`in_array($tag->id, old('tag_ids', []))`**: エラー後に前回チェックされていたタグを復元します。`old()` の第2引数 `[]` はデフォルト値で、初回表示時に `null` でエラーになるのを防ぎます。
 
@@ -180,12 +185,15 @@ contact.index               v                       v
 ```
 
 ```blade
-@if ($tags->isNotEmpty())
-    <span class="text-[#6b5744]">{{ $tags->pluck('name')->join(', ') }}</span>
-@endif
+@isset($tags)
+    @if ($tags->isNotEmpty())
+        <span class="text-[#6b5744]">{{ $tags->pluck('name')->join(', ') }}</span>
+    @endif
+@endisset
 ```
 
 - **`$category->content`**: コントローラーがIDからCategoryモデルを取得して渡してくれるので、ここでは名前を表示するだけです。
+- **`@isset($tags)`**: 入力フォームと同様に、`$tags` が渡されている場合のみタグ名を表示します。
 - **`$tags->pluck('name')->join(', ')`**: タグのコレクションから `name` だけを抽出し、カンマ区切りの文字列に変換しています（例：「質問, 要望」）。
 
 #### hidden inputによるデータ保持
@@ -210,7 +218,7 @@ contact.index               v                       v
 - **`$validated`**: コントローラーからバリデーション済みデータが連想配列として渡されます。
 - **`type="hidden"`**: ユーザーには見えないが、フォーム送信時にデータとして含まれます。「送信」ボタンを押すと、これらの値が `POST /contacts` に送られます。
 - **`{{ $validated['building'] ?? '' }}`**: `??` はPHPのNull合体演算子です。`building` は任意項目のため `null` の可能性があり、その場合は空文字を出力します。
-- **`name="tag_ids[]"`**: 入力フォームと同様、配列として送信するために `[]` を付けています。
+- **`name="tag_ids[]"`**: 入力フォームと同様、配列として送信するために `[]` を付けています。`@if (!empty(...))` で囲まれているため、基礎機能フェーズで `tag_ids` がなくてもエラーにはなりません。
 
 ### 4.4. この読み解きから分かること
 
@@ -218,8 +226,8 @@ contact.index               v                       v
 
 | Bladeファイル | コントローラーから受け取る変数 | 渡す側のメソッド |
 |:---|:---|:---|
-| `contact/index.blade.php` + `_form.blade.php` | `$categories`（全カテゴリー）, `$tags`（全タグ） | `ContactController@index` |
-| `contact/confirm.blade.php` | `$validated`（バリデーション済みデータ）, `$category`（カテゴリーモデル）, `$tags`（タグコレクション） | `ContactController@confirm` |
+| `contact/index.blade.php` + `_form.blade.php` | `$categories`（全カテゴリー）※ `$tags` は応用機能フェーズで追加 | `ContactController@index` |
+| `contact/confirm.blade.php` | `$validated`（バリデーション済みデータ）, `$category`（カテゴリーモデル）※ `$tags` は応用機能フェーズで追加 | `ContactController@confirm` |
 
 次のChapter 8では、この表の「渡す側のメソッド」を実際に実装します。
 
@@ -239,6 +247,10 @@ contact.index               v                       v
   - **何をしているか**: `old()`ヘルパーでバリデーションエラー時に前回入力された値を取得し、現在のカテゴリーIDと一致する場合に`selected`属性を付与しています。
   - **なぜそう書くか**: バリデーションエラーでフォームに戻された際、ユーザーが選択していたカテゴリーを復元するためです。これがないと、エラー後にセレクトボックスの選択状態がリセットされてしまい、ユーザーは再度選択し直す必要があります。
 
+- **`@isset($tags)` / `@endisset`**（タグセクション）
+  - **何をしているか**: `$tags` 変数が存在するかチェックし、存在する場合のみタグのチェックボックスを表示しています。
+  - **なぜそう書くか**: タグ機能は応用機能フェーズ（Chapter 13）で実装するため、基礎機能フェーズではコントローラーから `$tags` が渡されません。`@isset` で囲むことで、タグ機能の実装前でもエラーにならず、タグ以外の機能を正常に動作確認できます。
+
 - **`name="tag_ids[]"`**
   - **何をしているか**: チェックボックスの`name`属性に`[]`（ブラケット）を付けることで、複数選択された値が配列としてサーバーに送信されるようにしています。
   - **なぜそう書くか**: タグは複数選択可能です。ブラケットなしの`name="tag_ids"`だと、複数チェックされた場合に最後の値だけが送信されてしまいます。`[]`を付けることで、PHPのリクエスト処理が自動的に値を配列として解釈してくれます。
@@ -252,6 +264,9 @@ contact.index               v                       v
 - **`<input type="hidden" name="first_name" value="{{ $validated['first_name'] }}">`**
   - **何をしているか**: 表示とは別に、同じデータを非表示のフォームフィールドとして埋め込んでいます。
   - **なぜそう書くか**: 確認画面の「送信」ボタンを押した際に、このhidden inputのデータが次のPOSTリクエスト（`store`メソッド）に送信されます。HTTPはステートレスなので、前のリクエストのデータは自動的には引き継がれません。hidden inputは、複数ステップのフォームでデータを引き渡すための標準的な手法です。
+
+- **`@isset($tags)` / `@endisset`**（タグ表示部分）
+  - **何をしているか**: 入力フォームと同様、`$tags` 変数が存在する場合のみタグ名を表示します。基礎機能フェーズでは非表示になります。
 
 - **`$tags->pluck('name')->join(', ')`**
   - **何をしているか**: タグのコレクションから`name`プロパティだけを抽出し（`pluck`）、カンマ区切りの文字列に結合しています（`join`）。

@@ -82,7 +82,7 @@
                     </div>
                 </div>
 
-                @if ($contact->tags->isNotEmpty())
+                @if(method_exists($contact, 'tags') && $contact->tags->isNotEmpty())
                     <div class="grid grid-cols-3 border-b border-gray-200">
                         <div class="bg-[#baa999] px-6 py-4 flex items-center">
                             <span class="text-sm font-medium text-white">タグ</span>

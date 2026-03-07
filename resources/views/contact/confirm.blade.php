@@ -85,16 +85,18 @@
                 </div>
 
                 <!-- タグ -->
-                @if ($tags->isNotEmpty())
-                    <div class="grid grid-cols-3 border-b border-gray-200">
-                        <div class="bg-[#baa999] px-6 py-4 flex items-center">
-                            <span class="text-sm font-medium text-white">タグ</span>
+                @isset($tags)
+                    @if ($tags->isNotEmpty())
+                        <div class="grid grid-cols-3 border-b border-gray-200">
+                            <div class="bg-[#baa999] px-6 py-4 flex items-center">
+                                <span class="text-sm font-medium text-white">タグ</span>
+                            </div>
+                            <div class="col-span-2 bg-white px-6 py-4 flex items-center">
+                                <span class="text-[#6b5744]">{{ $tags->pluck('name')->join(', ') }}</span>
+                            </div>
                         </div>
-                        <div class="col-span-2 bg-white px-6 py-4 flex items-center">
-                            <span class="text-[#6b5744]">{{ $tags->pluck('name')->join(', ') }}</span>
-                        </div>
-                    </div>
-                @endif
+                    @endif
+                @endisset
 
                 <!-- お問い合わせ内容 -->
                 <div class="grid grid-cols-3">

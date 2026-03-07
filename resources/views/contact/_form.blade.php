@@ -171,6 +171,7 @@
 </div>
 
 <!-- タグ -->
+@isset($tags)
 <div class="grid grid-cols-3 gap-8 mb-4">
     <div class="col-span-1 flex items-center">
         <label class="text-sm text-[#6b5744]">
@@ -190,6 +191,7 @@
         </div>
     </div>
 </div>
+@endisset
 
 <!-- お問い合わせ内容 -->
 <div class="grid grid-cols-3 gap-8 mb-4">

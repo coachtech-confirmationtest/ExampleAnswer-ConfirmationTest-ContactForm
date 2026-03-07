@@ -96,9 +96,11 @@
                                 <td class="px-6 py-4 text-sm text-gray-700">{{ $contact->email }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-700">{{ $contact->category->content ?? '' }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-700">
-                                    @foreach ($contact->tags as $tag)
-                                        <span class="inline-block bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded mr-1">{{ $tag->name }}</span>
-                                    @endforeach
+                                    @if(method_exists($contact, 'tags'))
+                                        @foreach ($contact->tags as $tag)
+                                            <span class="inline-block bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded mr-1">{{ $tag->name }}</span>
+                                        @endforeach
+                                    @endif
                                 </td>
                                 <td class="px-6 py-4 text-sm">
                                     <a href="/admin/contacts/{{ $contact->id }}"
@@ -115,6 +117,7 @@
             </div>
 
             <!-- タグ管理 -->
+            @isset($tags)
             <div class="mt-12 bg-white rounded border border-gray-200 p-6">
                 <div class="flex items-center justify-between flex-wrap gap-4 mb-4">
                     <h3 class="text-lg font-semibold text-[#6b5744]">タグ管理</h3>
@@ -183,6 +186,7 @@
                     </table>
                 </div>
             </div>
+            @endisset
 
         </div>
     </div>
