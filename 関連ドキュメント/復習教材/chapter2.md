@@ -325,7 +325,7 @@ D. コードの解説
 - 設計案：
   - `categories`テーブルと`contacts`テーブルを作成
   - `contacts`テーブルに`category_id`カラムを持たせ、`categories`テーブルの`id`への外部キー制約を設定
-  - `onDelete(\'cascade\')`を設定
+  - `onDelete('cascade')`を設定
 - 不安な点：カテゴリを誤って削除した場合に、お問い合わせまで消えてしまうのが怖い。本当に`cascade`で良いのか迷っている。
 
 見てほしい観点：
