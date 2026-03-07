@@ -104,6 +104,10 @@ contact.index               v                       v
             </form>
         </div>
     </div>
+
+    @push('scripts')
+        @vite(['resources/js/contact/init.js'])
+    @endpush
 </x-guest-layout>
 ```
 
@@ -113,10 +117,11 @@ contact.index               v                       v
 - **`@csrf`**: CSRF（クロスサイトリクエストフォージェリ）攻撃を防ぐためのトークンを自動生成します。LaravelではPOSTフォームに必ず必要です。
 - **`@include('contact._form')`**: `_form.blade.php` を読み込みます。フォーム入力部品を別ファイルに切り出すことで、再利用性と見通しを向上させています。
 - **`action="/contacts/confirm"`**: フォーム送信先は `POST /contacts/confirm`。Chapter 8で実装する `ContactController@confirm` がこのリクエストを受け取ります。
+- **`@push('scripts')` / `@vite(...)`**: 電話番号の3分割入力欄を1つに結合するJavaScriptを読み込んでいます。`@push`はレイアウトの`@stack('scripts')`の位置にコンテンツを挿入するBladeディレクティブです。
 
 ### 4.2. フォーム部分テンプレート：`contact/_form.blade.php`
 
-`resources/views/contact/_form.blade.php` は入力フォームの各項目を定義しています。ここでは特に重要な **動的な選択肢の生成** と **エラー表示** の部分を見ていきます。
+`resources/views/contact/_form.blade.php` は入力フォームの各項目を定義しています。ここでは特に重要な **動的な選択肢の生成** と **エラー表示** の部分を抜粋して見ていきます。（実際のファイルにはCSSクラスやレイアウト用のHTML要素がさらに含まれますが、ロジックに関わる部分に絞って紹介します。）
 
 #### カテゴリーのセレクトボックス
 
@@ -165,7 +170,7 @@ contact.index               v                       v
 
 ### 4.3. 確認画面：`contact/confirm.blade.php`
 
-`resources/views/contact/confirm.blade.php` は、入力内容の表示とhidden inputによるデータ保持の2つの役割を担います。
+`resources/views/contact/confirm.blade.php` は、入力内容の表示とhidden inputによるデータ保持の2つの役割を担います。以下はロジックに関わる部分の抜粋です。
 
 #### カテゴリー名・タグ名の表示
 
