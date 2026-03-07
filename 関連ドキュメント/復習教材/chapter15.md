@@ -48,6 +48,14 @@ Laravelのテストは、大きく分けて2種類あります。
 >
 > `DB_CONNECTION` を `sqlite` に、`DB_DATABASE` を `:memory:` に設定することで、テスト実行時にインメモリデータベースが使用されます。これは、実際のファイルではなく、コンピュータのメモリ上に一時的にデータベースを構築する方式です。テスト用のMySQLデータベースを別途作成する必要がなく、セットアップが簡単です。
 
+### デフォルトのExampleTestの削除
+
+Laravelはプロジェクト作成時に `tests/Unit/ExampleTest.php` と `tests/Feature/ExampleTest.php` というサンプルテストファイルを自動生成します。これらはあくまでテスト環境の動作確認用のスキャフォールドであり、プロジェクト固有のテストを作成する段階では不要です。以下のコマンドで削除してください。
+
+```bash
+rm tests/Unit/ExampleTest.php tests/Feature/ExampleTest.php
+```
+
 ## 4. Factoryの作成 🏭
 
 テストを実行するには、テストデータが必要です。Factoryは、モデルに対応するダミーデータを簡単に生成するための仕組みです。
@@ -432,39 +440,41 @@ class IndexContactRequestTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function makeValidator(array $data)
+    private function validator(array $data)
     {
         $request = new IndexContactRequest();
-
-        return Validator::make($data, $request->rules());
+        return Validator::make($data, $request->rules(), $request->messages());
     }
 
-    public function test_rules_accept_valid_payload(): void
+    public function test_rules_accept_valid_filters(): void
     {
         $category = Category::factory()->create();
 
-        $validator = $this->makeValidator([
-            'keyword' => 'search term',
+        $validator = $this->validator([
+            'keyword' => 'Yamada',
             'gender' => 1,
             'category_id' => $category->id,
-            'date' => '2024-01-01',
+            'date' => '2024-02-01',
         ]);
 
         $this->assertTrue($validator->passes());
     }
 
-    public function test_rules_are_all_optional(): void
+    public function test_rules_reject_invalid_gender(): void
     {
-        $validator = $this->makeValidator([]);
+        $validator = $this->validator([
+            'gender' => 9,
+        ]);
 
-        $this->assertTrue($validator->passes());
+        $this->assertTrue($validator->fails());
+        $this->assertArrayHasKey('gender', $validator->errors()->messages());
     }
 }
 ```
 
 #### コード解説
-- `test_rules_accept_valid_payload()`: 検索条件として有効なデータがバリデーションを通過することをテストします。
-- `test_rules_are_all_optional()`: `IndexContactRequest`のルールは全て`nullable`（任意）なので、空のデータでもバリデーションを通過することをテストします。
+- `test_rules_accept_valid_filters()`: 検索条件として有効なデータがバリデーションを通過することをテストします。
+- `test_rules_reject_invalid_gender()`: 不正な性別値（`9`）がバリデーションに失敗し、`gender`フィールドにエラーが発生することをテストします。`IndexContactRequest`の`gender`ルールには`in:1,2,3`が含まれているため、範囲外の値は拒否されます。
 
 #### 5.2.3 ExportContactRequestのテスト
 
@@ -1223,8 +1233,8 @@ sail artisan test
    ✓ tag belongs to many contacts
 
    PASS  Tests\Unit\Requests\IndexContactRequestTest
-   ✓ rules accept valid payload
-   ✓ rules are all optional
+   ✓ rules accept valid filters
+   ✓ rules reject invalid gender
 
    PASS  Tests\Unit\Requests\StoreContactRequestTest
    ✓ rules accept valid payload with tags
@@ -1268,7 +1278,7 @@ sail artisan test
    ✓ authenticated user can delete tag
    ✓ unauthenticated user cannot create tag
 
-  Tests:  31 passed
+  Tests:  35 passed
   Time:   1.50s
 ```
 
