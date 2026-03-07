@@ -19,7 +19,7 @@ Laravelのテストは、大きく分けて2種類あります。
 
 テストを実行する前に、テスト専用のデータベース設定を行います。これにより、開発用のデータベースを汚すことなく、安全にテストを実行できます。
 
-プロジェクトのルートにある`phpunit.xml`ファイルを開き、`<php>`セクション内の`DB_DATABASE`の行を変更し、`DB_CONNECTION`の行を追加してください。
+プロジェクトのルートにある`phpunit.xml`ファイルを開き、`<php>`セクション内の`DB_CONNECTION`と`DB_DATABASE`の行を変更してください。
 
 **phpunit.xml（`<php>`セクション内の変更箇所）**
 ```xml
@@ -27,8 +27,8 @@ Laravelのテストは、大きく分けて2種類あります。
         <env name="APP_ENV" value="testing"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_DRIVER" value="array"/>
-        <env name="DB_CONNECTION" value="mysql"/>           <!-- 追加 -->
-        <env name="DB_DATABASE" value="contact_form_test"/> <!-- 変更: "testing" → "contact_form_test" -->
+        <env name="DB_CONNECTION" value="sqlite"/>  <!-- 追加 -->
+        <env name="DB_DATABASE" value=":memory:"/>  <!-- 変更: "testing" → ":memory:" -->
         <env name="MAIL_MAILER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
@@ -37,30 +37,16 @@ Laravelのテストは、大きく分けて2種類あります。
     </php>
 ```
 
-> **変更のポイント**: デフォルトでは `DB_DATABASE` が `"testing"` になっていますが、これを `"contact_form_test"` に変更します。また、`DB_CONNECTION` の行はデフォルトでは存在しないため、新規に追加してください。
+> **変更のポイント**: デフォルトでは `DB_DATABASE` が `"testing"` になっていますが、これを `":memory:"` に変更します。また、`DB_CONNECTION` の行はデフォルトでは存在しないため、新規に追加してください。
 
 ### コード解説
 - `<env name="APP_ENV" value="testing"/>`: Laravelに、現在の環境がテスト環境であることを伝えます。
-- `<env name="DB_CONNECTION" value="mysql"/>`: テストに使用するデータベースの種類を指定します。
-- `<env name="DB_DATABASE" value="contact_form_test"/>`: テスト専用のデータベース名を指定します。このデータベースは事前に作成しておく必要があります。
+- `<env name="DB_CONNECTION" value="sqlite"/>`: テストに使用するデータベースの種類をSQLiteに指定します。
+- `<env name="DB_DATABASE" value=":memory:"/>`: インメモリデータベースを使用します。ファイルではなくメモリ上に一時的にデータベースを構築するため、ディスクI/Oが発生せずテストが非常に高速に実行できます。テスト終了後はデータが自動的に破棄されるため、開発用データベースを汚す心配もありません。
 
-> **💡 テスト用データベースの作成**
+> **💡 インメモリデータベースとは？**
 >
-> `contact_form_test` データベースは事前に作成しておく必要があります。phpMyAdmin（`http://localhost:8080`）にアクセスし、新しいデータベース `contact_form_test` を作成してください。
-> または、以下のコマンドでも作成できます。
->
-> ```bash
-> sail mysql -u root -ppassword -e "CREATE DATABASE IF NOT EXISTS contact_form_test;"
-> ```
->
-> もし権限エラーが発生する場合は、以下のコマンドで権限を付与してください。
->
-> ```bash
-> sail mysql -u root -ppassword -e "GRANT ALL PRIVILEGES ON contact_form_test.* TO 'sail'@'%'; FLUSH PRIVILEGES;"
-> ```
-
-> **💡 なぜインメモリDB（sqlite, :memory:）を使わないの？**
-> インメモリデータベースは高速ですが、MySQLなどの実際の運用環境とは挙動が異なる場合があります。特に、MySQL特有の関数や制約を使用している場合、テストが通っても本番でエラーになる可能性があります。今回は、より本番環境に近い形でテストを行うため、MySQLを使用します。
+> `DB_CONNECTION` を `sqlite` に、`DB_DATABASE` を `:memory:` に設定することで、テスト実行時にインメモリデータベースが使用されます。これは、実際のファイルではなく、コンピュータのメモリ上に一時的にデータベースを構築する方式です。テスト用のMySQLデータベースを別途作成する必要がなく、セットアップが簡単です。
 
 ## 4. Factoryの作成 🏭
 
