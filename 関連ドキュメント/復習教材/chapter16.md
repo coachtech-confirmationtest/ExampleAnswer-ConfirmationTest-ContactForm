@@ -1812,7 +1812,65 @@ sail artisan test --coverage
 
 要件シートでは**70%超**が目安とされています。カバレッジはあくまで参考指標ですので、全てのテストがパスしていれば問題ありません。
 
-## 9. まとめ ✨
+## 9. コードフォーマット（Laravel Pint） 🎨
+
+全てのテストがパスしたら、提出前の最後のステップとして**コードフォーマット**を行います。
+
+### Laravel Pintとは？
+
+Laravel Pintは、Laravel公式のコードフォーマッター（自動整形ツール）です。PHP-CS-Fixerをベースに、PSR-12 + Laravel独自のコーディングルールに従ってコードスタイルを自動統一してくれます。
+
+Laravelプロジェクトには `composer.json` の `require-dev` にデフォルトで含まれているため、追加インストールは不要です。
+
+### Pintの実行
+
+以下のコマンドを実行すると、プロジェクト内のPHPファイルが自動的に整形されます。
+
+```bash
+sail bin pint
+```
+
+実行すると、整形されたファイルの一覧が表示されます。
+
+```
+  ✓ app/Http/Controllers/Api/V1/ContactController.php
+  ✓ app/Http/Requests/Api/V1/IndexContactRequest.php
+  ...
+
+  Fixed 5 files.
+```
+
+> **💡 `sail bin pint` と `vendor/bin/pint` の違い**
+>
+> `sail bin pint` はSailコンテナ内でPintを実行するコマンドです。ローカル環境（Sailを使わない場合）では `vendor/bin/pint` を使います。どちらも結果は同じです。
+
+### 整形結果の確認（ドライラン）
+
+実際にファイルを変更せずに、整形が必要かどうかだけを確認したい場合は `--test` フラグを付けます。
+
+```bash
+sail bin pint --test
+```
+
+- **整形済み（変更不要）**: `No fixable issues were found` と表示されます。
+- **未整形（変更が必要）**: 修正が必要なファイルの一覧が表示されます。
+
+### 運用のポイント
+
+- **コミット前に必ず実行する**: `sail bin pint` を実行してから `git add` → `git commit` の流れを習慣にしましょう。
+- **整形後の差分を確認する**: `sail bin pint` 実行後、`git diff` で変更内容を確認してからコミットすると安心です。
+
+```bash
+# 実行 → 確認 → コミット の流れ
+sail bin pint
+git diff
+git add -A
+git commit -m "style: apply Laravel Pint formatting"
+```
+
+---
+
+## 10. まとめ ✨
 
 お疲れ様でした！このチャプターでは、Laravelの自動テスト機能を網羅的に学び、アプリケーションの品質をコードで保証する方法を習得しました。
 
