@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Category;
 use App\Models\Contact;
+use App\Models\Tag;
 use Faker\Factory as Faker;
 use Illuminate\Database\Seeder;
 
@@ -16,10 +17,11 @@ class ContactSeeder extends Seeder
     {
         $faker = Faker::create('ja_JP');
         $categories = Category::all();
+        $tags = Tag::all();
 
         // サンプルデータを20件作成
         for ($i = 0; $i < 20; $i++) {
-            Contact::create([
+            $contact = Contact::create([
                 'first_name' => $faker->lastName,
                 'last_name' => $faker->firstName,
                 'gender' => $faker->numberBetween(1, 3),
@@ -30,6 +32,12 @@ class ContactSeeder extends Seeder
                 'category_id' => $categories->random()->id,
                 'detail' => $faker->realText(120),
             ]);
+
+            // タグをランダムに1〜3件紐付け
+            if ($tags->isNotEmpty()) {
+                $randomTags = $tags->random(rand(1, min(3, $tags->count())));
+                $contact->tags()->attach($randomTags->pluck('id'));
+            }
         }
     }
 }

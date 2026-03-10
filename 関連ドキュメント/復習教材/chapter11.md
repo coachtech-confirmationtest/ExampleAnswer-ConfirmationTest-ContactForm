@@ -167,7 +167,65 @@ class DatabaseSeeder extends Seeder
 }
 ```
 
-### 4.5. `Contact`モデルの編集
+### 4.5. `ContactSeeder`の編集
+
+`TagSeeder`でタグのマスターデータが作成されるようになったので、`ContactSeeder`を編集して、各Contactにランダムにタグを紐付けるようにします。
+
+`database/seeders/ContactSeeder.php`を以下のように編集します。
+
+```php
+<?php
+
+namespace Database\Seeders;
+
+use App\Models\Category;
+use App\Models\Contact;
+use App\Models\Tag;
+use Faker\Factory as Faker;
+use Illuminate\Database\Seeder;
+
+class ContactSeeder extends Seeder
+{
+    /**
+     * Run the database seeds.
+     */
+    public function run(): void
+    {
+        $faker = Faker::create('ja_JP');
+        $categories = Category::all();
+        $tags = Tag::all();
+
+        // サンプルデータを20件作成
+        for ($i = 0; $i < 20; $i++) {
+            $contact = Contact::create([
+                'first_name' => $faker->lastName,
+                'last_name' => $faker->firstName,
+                'gender' => $faker->numberBetween(1, 3),
+                'email' => $faker->unique()->safeEmail,
+                'tel' => $faker->numerify('###########'),
+                'address' => $faker->prefecture . $faker->city . $faker->streetAddress,
+                'building' => $faker->optional()->secondaryAddress,
+                'category_id' => $categories->random()->id,
+                'detail' => $faker->realText(120),
+            ]);
+
+            // タグをランダムに1〜3件紐付け
+            if ($tags->isNotEmpty()) {
+                $randomTags = $tags->random(rand(1, min(3, $tags->count())));
+                $contact->tags()->attach($randomTags->pluck('id'));
+            }
+        }
+    }
+}
+```
+
+**変更点（chapter5で作成した時点との差分）:**
+- `use App\Models\Tag;` を追加
+- `$tags = Tag::all();` でタグ一覧を取得
+- `Contact::create()` の戻り値を `$contact` 変数に格納するように変更
+- ループ内で `$contact->tags()->attach()` によりランダムにタグを紐付け
+
+### 4.6. `Contact`モデルの編集
 
 既存の`app/Models/Contact.php`に、`tags`リレーションを追加します。
 
@@ -210,7 +268,7 @@ class Contact extends Model
 }
 ```
 
-### 4.6. マイグレーションとシーディングの実行
+### 4.7. マイグレーションとシーディングの実行
 
 ここまでの実装が完了したら、マイグレーションとシーディングを実行して、データベースにタグのテーブルとデータを反映させます。
 
@@ -222,9 +280,8 @@ sail artisan migrate:fresh --seed
 
 実行後、phpMyAdminなどで以下を確認してみましょう。
 
-- `tags` テーブルが作成されていること
-- `contact_tag` テーブル（中間テーブル）が作成されていること
-- `tags` テーブルに5件の初期データ（質問、要望、不具合報告、ご意見、その他）が入っていること
+- `tags` テーブルが作成され、5件の初期データ（質問、要望、不具合報告、ご意見、その他）が入っていること
+- `contact_tag` テーブル（中間テーブル）が作成され、各Contactにタグが紐付けられていること（レコードが存在すること）
 
 ## 5. コードの詳細解説 🔍
 
@@ -250,11 +307,28 @@ sail artisan migrate:fresh --seed
   - **何をしているか**: `$tag`配列と同じデータがテーブルに存在しない場合のみ、新しいレコードとして作成します。
   - **なぜそう書くか**: `db:seed`コマンドを何度実行しても同じデータが重複して登録されるのを防ぐためです。シーダーが冪等性（べきとうせい：何度実行しても結果が同じになる性質）を持つことは、安定した開発環境を維持するために非常に重要です。
 
+### `database/seeders/ContactSeeder.php` の解説（タグ紐付け部分）
+
+- **`$tags = Tag::all();`**
+  - **何をしているか**: `tags`テーブルの全レコードを取得し、コレクションとして`$tags`に格納します。
+  - **なぜそう書くか**: ループ内で毎回DBにアクセスするのではなく、ループ外で一度だけ取得することで、パフォーマンスを向上させます。
+
+- **`$contact = Contact::create([...]);`**
+  - **何が変わったか**: chapter5で作成した時点では`Contact::create([...]);`の戻り値を使用していませんでしたが、タグを紐付けるために`$contact`変数に格納するように変更しました。
+
+- **`$tags->random(rand(1, min(3, $tags->count())))`**
+  - **何をしているか**: タグのコレクションからランダムに1〜3件を取得します。`min(3, $tags->count())`により、タグが3件未満の場合でもエラーにならないようにしています。
+  - **なぜそう書くか**: 実際のフォーム入力に近いデータを生成するためです。全てのContactに同じタグが紐付くのではなく、ランダムに異なるタグが紐付くことで、管理画面やAPIで確認した際にリアルなデータとなります。
+
+- **`$contact->tags()->attach($randomTags->pluck('id'));`**
+  - **何をしているか**: `$contact`のタグリレーションに対して、ランダムに選んだタグのIDを紐付けます。`pluck('id')`でIDの配列を取得し、`attach()`で中間テーブル（`contact_tag`）にレコードを作成します。
+  - **なぜそう書くか**: `attach()`はリレーション定義で学んだ`belongsToMany`の操作メソッドです。シーダーで使うことで、初期データの段階からContactとTagの紐付けが確認できる状態になります。
+
 ### `database/seeders/DatabaseSeeder.php` の解説
 
 - **`$this->call([...])`**
   - **何をしているか**: `db:seed`コマンドが実行されたときに、この配列に登録されたシーダークラスを上から順番に実行します。
-  - **なぜそう書くか**: `TagSeeder`を`ContactSeeder`よりも前に配置することで、`ContactSeeder`が実行される時点では、既に`tags`テーブルにデータが存在している状態を保証します。シーダーの実行順序は、外部キー制約などでエラーを起こさないために重要です。
+  - **なぜそう書くか**: `TagSeeder`を`ContactSeeder`よりも前に配置することで、`ContactSeeder`が実行される時点では、既に`tags`テーブルにデータが存在している状態を保証します。`ContactSeeder`内で`Tag::all()`を呼び出してタグを紐付けるため、この実行順序が重要です。
 
 ### `app/Models/Contact.php` の解説
 

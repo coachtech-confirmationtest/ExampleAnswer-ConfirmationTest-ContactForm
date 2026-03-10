@@ -52,6 +52,20 @@
 | Laravel単体 | ログイン機能において、誤った資格情報でログインした際にエラーメッセージが表示されるか。 | 1 | FALSE | 0 |
 | Laravel単体 | ログアウト機能において、ログアウト操作でセッションが破棄されるか。 | 1 | FALSE | 0 |
 | Laravel単体 | ログアウト機能において、ログアウト後に /admin へアクセスできないか。 | 1 | FALSE | 0 |
+| Laravel単体 | 公開API機能において、GET /api/v1/contacts にアクセスした際にJSON形式でお問い合わせ一覧が返るか。 | 1 | FALSE | 0 |
+| Laravel単体 | 公開API機能において、一覧レスポンスにdata配列とmeta情報（current_page, last_page, per_page, total）が含まれるか。 | 1 | FALSE | 0 |
+| Laravel単体 | 公開API機能において、keyword検索パラメータが正しく動作するか。 | 1 | FALSE | 0 |
+| Laravel単体 | 公開API機能において、gender/category_id/dateフィルタが正しく動作するか。 | 1 | FALSE | 0 |
+| Laravel単体 | 公開API機能において、ページネーションがデフォルト20件ごとに動作し、per_pageパラメータで変更可能か。 | 1 | FALSE | 0 |
+| Laravel単体 | 公開API機能において、GET /api/v1/contacts/{id} にアクセスした際にJSON形式で詳細が返るか。 | 1 | FALSE | 0 |
+| Laravel単体 | 公開API機能において、詳細レスポンスにcategoryとtagsがネストされているか。 | 1 | FALSE | 0 |
+| Laravel単体 | 公開API機能において、存在しないIDで404エラーJSONが返るか。 | 1 | FALSE | 0 |
+| Laravel単体 | 公開API機能において、POST /api/v1/contacts でお問い合わせが作成され201が返るか。 | 1 | FALSE | 0 |
+| Laravel単体 | 公開API機能において、PUT /api/v1/contacts/{id} でお問い合わせが更新され200が返るか。 | 1 | FALSE | 0 |
+| Laravel単体 | 公開API機能において、DELETE /api/v1/contacts/{id} でお問い合わせが削除され204が返るか。 | 1 | FALSE | 0 |
+| Laravel単体 | 公開API機能において、API用コントローラーがWeb用と分離されているか（Api\V1名前空間）。 | 1 | FALSE | 0 |
+| Laravel単体 | 公開API機能において、API ResourcesによるJSON整形が使用されているか。 | 1 | FALSE | 0 |
+| Laravel単体 | 公開API機能において、API用のFormRequest（Api\V1名前空間）でバリデーションが実装されているか。 | 1 | FALSE | 0 |
 | マイグレーション | usersテーブルにおいて、id がBIGINT AUTO_INCREMENT + PRIMARY KEY になっているか。 | 1 | FALSE | 0 |
 | マイグレーション | usersテーブルにおいて、name / email / password が VARCHAR(255) で、email に UNIQUE 制約があるか。 | 1 | FALSE | 0 |
 | マイグレーション | usersテーブルにおいて、email_verified_at が NULL許容の timestamp になっているか。 | 1 | FALSE | 0 |
@@ -87,10 +101,13 @@
 | バリデーション | CSVエクスポートにて、以下のルールでフォームリクエストを用いたバリデーションができていること keyword: nullable / string / max:255、gender: nullable / integer / in:0,1,2,3、category_id: nullable / integer / exists:categories,id、date: nullable / date | 1 | FALSE | 0 |
 | バリデーション | 管理ユーザー登録画面にて、以下のルールでバリデーションができていること name: 必須 / string / max:255、email: 必須 / email / max:255 / unique、password: Fortify標準（8文字以上・確認用一致） | 1 | FALSE | 0 |
 | バリデーション | ログイン画面にて、以下のルールでバリデーションができていること email: 必須 / email / max:255、password: 必須 | 1 | FALSE | 0 |
+| バリデーション | お問い合わせ一覧APIにて、以下のルールでフォームリクエストを用いたバリデーションができていること keyword: nullable / string / max:255、gender: nullable / integer / in:1,2,3、category_id: nullable / integer / exists:categories,id、date: nullable / date、per_page: nullable / integer / min:1 / max:100 | 1 | FALSE | 0 |
+| バリデーション | お問い合わせ作成・更新APIにて、Web版と同一ルール（first_name〜detail + tag_ids[]）でフォームリクエストを用いたバリデーションができていること | 1 | FALSE | 0 |
 | シーディング | 要件の指示に従って、Userテーブルのダミーデータとして要件で指示されたユーザーを作成することができているか | 1 | FALSE | 0 |
 | シーディング | 要件の指示に従って、categoryテーブルのダミーデータ 5件を作成できているか | 1 | FALSE | 0 |
 | シーディング | 要件の指示に従って、Tagテーブルのダミーデータを5件作成できているか | 1 | FALSE | 0 |
 | シーディング | 要件の指示に従って、contactsテーブルのダミーデータ 20件を作成できるか | 1 | FALSE | 0 |
+| シーディング | ContactSeederにて、各Contactに対して既存タグからランダムに1〜3件を attach() で紐付け、contact_tag 中間テーブルにレコードが作成されているか | 1 | FALSE | 0 |
 | マイグレーション | テーブル仕様に従った contactsテーブルのマイグレーションファイルを作成できているか | 1 | FALSE | 0 |
 | マイグレーション | テーブル仕様に従った categoriesテーブルのマイグレーションファイルを作成できているか | 1 | FALSE | 0 |
 | マイグレーション | テーブル仕様に従った usersテーブルのマイグレーションファイルを作成できているか | 1 | FALSE | 0 |
@@ -113,6 +130,13 @@
 | テスト | タグ管理（TagControllerTest）において、認証ユーザーによるタグの作成・更新・削除が /admin へリダイレクト付きで行え、未認証時は /login へリダイレクトされることを検証する Feature Tests が実装されパスしているか。 | 1 | FALSE | 0 |
 | テスト | ユーザー向け画面表示（ContactPageTest）において、/ でカテゴリ・タグがサーバーサイド描画され、/thanks が正常に表示されることを検証する Feature Tests が実装されパスしているか。 | 1 | FALSE | 0 |
 | テスト | CSVダウンロードのエクスポート機能において、ログイン済み管理者がフィルタ条件付きでCSVをDLでき、無指定時は新着順で出力されることを検証する Feature Tests が実装されパスしているか。 | 1 | FALSE | 0 |
+| テスト | API検索バリデーション（Api\V1\IndexContactRequest）において、有効なフィルタの受付と不正な性別値(0含む)・per_page超過を拒否することを検証する Unit Tests が実装されパスしているか。 | 1 | FALSE | 0 |
+| テスト | API作成バリデーション（Api\V1\StoreContactRequest）において、全必須項目・タグの受付と不正な値の拒否を検証する Unit Tests が実装されパスしているか。 | 1 | FALSE | 0 |
+| テスト | お問い合わせ一覧API（GET /api/v1/contacts）において、JSON一覧取得・検索・ページネーション・バリデーションエラーを検証する Feature Tests が実装されパスしているか。 | 1 | FALSE | 0 |
+| テスト | お問い合わせ詳細API（GET /api/v1/contacts/{id}）において、詳細取得と404エラーを検証する Feature Tests が実装されパスしているか。 | 1 | FALSE | 0 |
+| テスト | お問い合わせ作成API（POST /api/v1/contacts）において、201レスポンス・DB保存・バリデーションエラーを検証する Feature Tests が実装されパスしているか。 | 1 | FALSE | 0 |
+| テスト | お問い合わせ更新API（PUT /api/v1/contacts/{id}）において、200レスポンス・更新反映・404エラーを検証する Feature Tests が実装されパスしているか。 | 1 | FALSE | 0 |
+| テスト | お問い合わせ削除API（DELETE /api/v1/contacts/{id}）において、204レスポンス・レコード削除・404エラーを検証する Feature Tests が実装されパスしているか。 | 1 | FALSE | 0 |
 | コード品質 | お問い合わせ一覧取得において、Eager Loading（withメソッド等）を使用して、カテゴリ取得によるN+1問題が防止されているか。 | 1 | FALSE | 0 |
 | コード品質 | 変数名などに、a,xなどの意味のない命名をしない | 1 | FALSE | 0 |
 | コード品質 | 変数名などに、ローマ字などの英単語ではないもので命名をしない | 1 | FALSE | 0 |
@@ -139,14 +163,14 @@
 
 | 大項目 | 項目数 | 配点合計 |
 |--------|--------|---------|
-| Laravel単体 | 48 | 48 |
+| Laravel単体 | 63 | 63 |
 | マイグレーション | 32 | 32 |
-| バリデーション | 8 | 8 |
-| シーディング | 4 | 4 |
-| テスト | 17 | 17 |
+| バリデーション | 10 | 10 |
+| シーディング | 5 | 5 |
+| テスト | 24 | 24 |
 | コード品質 | 17 | 17 |
 | ドキュメント | 2 | 4 |
-| **合計** | **128** | **130** |
+| **合計** | **153** | **155** |
 
 ## 旧版（API版）からの変更サマリ
 

@@ -1,1313 +1,808 @@
-# Chapter 15: 鉄壁の品質保証 - Laravelの自動テストをマスターする 🛡️
+# Chapter 15: 応用編 - 公開APIの提供 🌐
 
 ## 1. はじめに 📖
 
-おめでとうございます！ついに最終チャプターです。このチャプターでは、これまで作り上げてきた「お問い合わせ管理システム」の品質を保証するための「自動テスト」を実装します。自動テストは、一度書けば何度でも同じ検証を瞬時に実行してくれる、品質保証の強力な武器です。デグレード（機能改修によって既存の機能が壊れること）を防ぎ、自信を持ってアプリケーションをリリースするために不可欠なスキルです。
+このチャプターでは、これまでBlade（SSR）で構築してきたお問い合わせ管理システムに、**公開API**を追加します。
 
-このチャプターを終える頃には、あなたはLaravelのテスト機能を使いこなし、堅牢なアプリケーションを構築する術を身につけているでしょう。
+### APIとは？
 
-## 2. テストの全体像 🗺️
+API（Application Programming Interface）とは、アプリケーション同士がデータをやり取りするための「窓口」です。Webアプリケーションでは一般的に、**JSON形式**でデータを送受信するHTTPベースのAPIを指します。
 
-Laravelのテストは、大きく分けて2種類あります。
+これまで実装してきたWebアプリケーションは、ブラウザに**HTML**を返す仕組みでした。一方、APIは**JSONデータ**を返します。これにより、モバイルアプリや他のWebサービス、フロントエンドフレームワーク（React、Vue.jsなど）からデータを取得・操作できるようになります。
 
-- **単体テスト (Unit Tests)**: モデルやリクエストクラスなど、アプリケーションの比較的小さな「部品（ユニット）」が、それぞれ単体で正しく動作するかを検証します。
-- **機能テスト (Feature Tests)**: 複数の部品が連携して、一つの「機能」として正しく動作するかを検証します。実際にHTTPリクエストを送信し、ユーザーの操作をシミュレートします。
+### なぜWebアプリにAPIを追加するのか？
 
-このチャプターでは、両方のテストをバランス良く実装していきます。
+実務では、1つのバックエンドが複数のクライアント（Webブラウザ、スマホアプリ、外部サービス）にデータを提供するケースが非常に多くあります。APIを提供することで、同じデータやビジネスロジックを再利用できます。
 
-## 3. テストの準備 🛠️
+### このチャプターで学ぶこと
 
-テストを実行する前に、テスト専用のデータベース設定を行います。これにより、開発用のデータベースを汚すことなく、安全にテストを実行できます。
+- **API Resources** — EloquentモデルをJSON形式に変換する仕組み
+- **API用FormRequest** — Web版とは別のバリデーションルール
+- **API用コントローラー** — JSON応答、HTTPステータスコード（200, 201, 204, 404, 422）
+- **APIルーティング** — `routes/api.php` と `/api` プレフィックスの仕組み
 
-プロジェクトのルートにある`phpunit.xml`ファイルを開き、`<php>`セクション内の`DB_CONNECTION`と`DB_DATABASE`の行を変更してください。
+---
 
-**phpunit.xml（`<php>`セクション内の変更箇所）**
-```xml
-    <php>
-        <env name="APP_ENV" value="testing"/>
-        <env name="BCRYPT_ROUNDS" value="4"/>
-        <env name="CACHE_DRIVER" value="array"/>
-        <env name="DB_CONNECTION" value="sqlite"/>  <!-- 追加 -->
-        <env name="DB_DATABASE" value=":memory:"/>  <!-- 変更: "testing" → ":memory:" -->
-        <env name="MAIL_MAILER" value="array"/>
-        <env name="PULSE_ENABLED" value="false"/>
-        <env name="QUEUE_CONNECTION" value="sync"/>
-        <env name="SESSION_DRIVER" value="array"/>
-        <env name="TELESCOPE_ENABLED" value="false"/>
-    </php>
-```
+## 2. 要件確認 📋
 
-> **変更のポイント**: デフォルトでは `DB_DATABASE` が `"testing"` になっていますが、これを `":memory:"` に変更します。また、`DB_CONNECTION` の行はデフォルトでは存在しないため、新規に追加してください。
+今回実装するAPIの要件を確認しましょう。
 
-### コード解説
-- `<env name="APP_ENV" value="testing"/>`: Laravelに、現在の環境がテスト環境であることを伝えます。
-- `<env name="DB_CONNECTION" value="sqlite"/>`: テストに使用するデータベースの種類をSQLiteに指定します。
-- `<env name="DB_DATABASE" value=":memory:"/>`: インメモリデータベースを使用します。ファイルではなくメモリ上に一時的にデータベースを構築するため、ディスクI/Oが発生せずテストが非常に高速に実行できます。テスト終了後はデータが自動的に破棄されるため、開発用データベースを汚す心配もありません。
+### エンドポイント一覧
 
-> **💡 インメモリデータベースとは？**
+| HTTPメソッド | URI | 説明 |
+|---|---|---|
+| GET | `/api/v1/contacts` | お問い合わせ一覧（検索・ページネーション付き） |
+| GET | `/api/v1/contacts/{contact}` | お問い合わせ詳細 |
+| POST | `/api/v1/contacts` | お問い合わせ新規作成 |
+| PUT | `/api/v1/contacts/{contact}` | お問い合わせ更新 |
+| DELETE | `/api/v1/contacts/{contact}` | お問い合わせ削除 |
+
+### 設計方針
+
+- **認証不要**: 公開APIとして、認証なしでアクセスできる（Sanctumは使用しない）
+- **API Resources使用**: EloquentモデルのJSON変換にAPI Resourcesを使用する
+- **Web版と分離**: コントローラー・FormRequestはAPI専用のものを `Api\V1` 名前空間に作成する
+- **バージョニング**: `/api/v1/` プレフィックスでAPIバージョンを管理する
+
+> **💡 なぜWeb版と分離するのか？**
 >
-> `DB_CONNECTION` を `sqlite` に、`DB_DATABASE` を `:memory:` に設定することで、テスト実行時にインメモリデータベースが使用されます。これは、実際のファイルではなく、コンピュータのメモリ上に一時的にデータベースを構築する方式です。テスト用のMySQLデータベースを別途作成する必要がなく、セットアップが簡単です。
+> Web版のコントローラーはBladeビューを返し、FormRequestのgenderルールは `in:0,1,2,3`（0=全て）です。
+> API版はJSONを返し、genderは `in:1,2,3`（パラメータ省略=全て）です。
+> レスポンス形式やバリデーションルールが異なるため、責務を分離します。
 
-### デフォルトのExampleTestの削除
+---
 
-Laravelはプロジェクト作成時に `tests/Unit/ExampleTest.php` と `tests/Feature/ExampleTest.php` というサンプルテストファイルを自動生成します。これらはあくまでテスト環境の動作確認用のスキャフォールドであり、プロジェクト固有のテストを作成する段階では不要です。以下のコマンドで削除してください。
+## 3. API Resourcesの作成 🎨
 
-```bash
-rm tests/Unit/ExampleTest.php tests/Feature/ExampleTest.php
-```
+API Resourcesは、EloquentモデルをJSON形式に変換する「変換レイヤー」です。モデルの全カラムをそのまま返すのではなく、APIとして公開したいフィールドだけを選択的に返せます。
 
-## 4. Factoryの作成 🏭
+### 3-1. CategoryResourceの作成
 
-テストを実行するには、テストデータが必要です。Factoryは、モデルに対応するダミーデータを簡単に生成するための仕組みです。
-
-### 4.1 CategoryFactory
+まず、カテゴリ用のAPI Resourceを作成します。
 
 ```bash
-sail artisan make:factory CategoryFactory --model=Category
+sail artisan make:resource CategoryResource
 ```
 
-作成された`database/factories/CategoryFactory.php`を以下のように編集します。
-
-**database/factories/CategoryFactory.php**
+**app/Http/Resources/CategoryResource.php**
 ```php
 <?php
 
-namespace Database\Factories;
+namespace App\Http\Resources;
 
-use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
 
-/**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Category>
- */
-class CategoryFactory extends Factory
+class CategoryResource extends JsonResource
 {
     /**
-     * Define the model's default state.
+     * Transform the resource into an array.
      *
      * @return array<string, mixed>
      */
-    public function definition(): array
+    public function toArray(Request $request): array
     {
         return [
-            'content' => $this->faker->words(3, true),
+            'id' => $this->id,
+            'content' => $this->content,
         ];
     }
 }
 ```
 
-### コード解説
-- `definition()`: このFactoryを使ってモデルが作成される際の、デフォルトのデータ構造を定義します。
-- `$this->faker->words(3, true)`: PHPのダミーデータ生成ライブラリ「Faker」を使って、ランダムな3つの単語を文字列として生成します。
+#### コード解説
+- `JsonResource` を継承し、`toArray()` メソッドでJSON出力するフィールドを定義します。
+- `$this->id` や `$this->content` は、元のCategoryモデルのプロパティにアクセスしています。
+- `created_at` や `updated_at` はAPIとして不要なので含めていません。
 
-### 4.2 ContactFactory
+### 3-2. TagResourceの作成
 
 ```bash
-sail artisan make:factory ContactFactory --model=Contact
+sail artisan make:resource TagResource
 ```
 
-作成された`database/factories/ContactFactory.php`を以下のように編集します。
-
-**database/factories/ContactFactory.php**
+**app/Http/Resources/TagResource.php**
 ```php
 <?php
 
-namespace Database\Factories;
+namespace App\Http\Resources;
 
-use App\Models\Category;
-use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
 
-/**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Contact>
- */
-class ContactFactory extends Factory
+class TagResource extends JsonResource
 {
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
-    public function definition(): array
+    public function toArray(Request $request): array
     {
         return [
-            'category_id' => Category::factory(),
-            'first_name' => $this->faker->lastName(),
-            'last_name' => $this->faker->firstName(),
-            'gender' => $this->faker->numberBetween(1, 3),
-            'email' => $this->faker->unique()->safeEmail(),
-            'tel' => $this->faker->numerify('0##########'),
-            'address' => $this->faker->streetAddress(),
-            'building' => $this->faker->optional()->secondaryAddress(),
-            'detail' => $this->faker->text(60),
+            'id' => $this->id,
+            'name' => $this->name,
         ];
     }
 }
 ```
 
-### コード解説
-- `'category_id' => Category::factory()`: `Contact`モデルは`Category`モデルに属しているため、`Contact`を作成する際に、関連する`Category`も自動で作成するように定義しています。
-- `$this->faker->lastName()`: Fakerを使って、リアルな「姓」を生成します。このプロジェクトでは`first_name`カラムに姓を格納するため、Fakerの`lastName`を使います。同様に`last_name`カラムには`firstName`で「名」を格納します。
-- `$this->faker->numerify('0##########')`: ` #` をランダムな数字（0-9）に置き換えます。先頭の`0`を固定し、残り10桁をランダムにして11桁の電話番号を生成しています。
-- `$this->faker->optional()->secondaryAddress()`: 50%の確率で`null`を、そうでなければ建物の部屋番号などを生成します。`building`カラムが`nullable`な場合に対応できます。
+### 3-3. ContactResourceの作成
 
-### 4.3 TagFactory
+ContactResourceは、リレーションデータ（category, tags）もネストして返します。
 
 ```bash
-sail artisan make:factory TagFactory --model=Tag
+sail artisan make:resource ContactResource
 ```
 
-作成された`database/factories/TagFactory.php`を以下のように編集します。
-
-**database/factories/TagFactory.php**
+**app/Http/Resources/ContactResource.php**
 ```php
 <?php
 
-namespace Database\Factories;
+namespace App\Http\Resources;
 
-use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
 
-/**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Tag>
- */
-class TagFactory extends Factory
+class ContactResource extends JsonResource
 {
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
-    public function definition(): array
+    public function toArray(Request $request): array
     {
         return [
-            'name' => $this->faker->unique()->words(2, true),
+            'id' => $this->id,
+            'category' => new CategoryResource($this->whenLoaded('category')),
+            'first_name' => $this->first_name,
+            'last_name' => $this->last_name,
+            'gender' => $this->gender,
+            'email' => $this->email,
+            'tel' => $this->tel,
+            'address' => $this->address,
+            'building' => $this->building,
+            'detail' => $this->detail,
+            'tags' => TagResource::collection($this->whenLoaded('tags')),
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
         ];
     }
 }
 ```
 
-### コード解説
-- `$this->faker->unique()->words(2, true)`: ランダムな2つの単語を文字列として生成します。`unique()`を付けることで、複数のタグを生成した際に名前が重複しないようにしています。
-
-## 5. 単体テスト (Unit Tests) の作成 🔬
-
-まずは、アプリケーションの最小単位である「モデル」「リクエスト」が正しく動作するかを検証する単体テストから作成します。
-
-### 5.1 Models
-
-モデルのテストでは、主にリレーションシップが正しく定義されているかを確認します。
-
-#### 5.1.1 Categoryモデルのテスト
-
-```bash
-sail artisan make:test Models/CategoryTest --unit
-```
-
-作成された`tests/Unit/Models/CategoryTest.php`を以下のように編集します。
-
-**tests/Unit/Models/CategoryTest.php**
-```php
-<?php
-
-namespace Tests\Unit\Models;
-
-use App\Models\Category;
-use App\Models\Contact;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
-
-class CategoryTest extends TestCase
-{
-    use RefreshDatabase;
-
-    public function test_category_has_many_contacts(): void
-    {
-        $category = Category::factory()->create();
-        Contact::factory()->count(2)->for($category)->create();
-
-        $this->assertCount(2, $category->fresh()->contacts);
-        $this->assertInstanceOf(Contact::class, $category->contacts->first());
-    }
-}
-```
-
 #### コード解説
-- `use RefreshDatabase;`: このトレイトを使用すると、各テストメソッドの実行前にデータベースがマイグレーションされ、実行後にロールバックされます。これにより、他のテストの影響を受けないクリーンな状態でテストを実行できます。
-- `test_category_has_many_contacts()`: `Category`モデルが`contacts`リレーション（一対多）を正しく持っているかをテストします。
-- `$category = Category::factory()->create();`: テスト対象のカテゴリを1つ作成します。
-- `Contact::factory()->count(2)->for($category)->create();`: 作成したカテゴリに属するお問い合わせを2つ作成します。
-- `$this->assertCount(2, $category->fresh()->contacts);`: `fresh()`でデータベースからモデルを再取得し、`contacts`リレーション経由で取得したお問い合わせのコレクションの件数が2件であることをアサート（断言）します。
-- `$this->assertInstanceOf(Contact::class, $category->contacts->first());`: コレクションの最初の要素が`Contact`クラスのインスタンスであることをアサートし、リレーションが正しいモデルを返していることを確認します。
+- `new CategoryResource($this->whenLoaded('category'))`: categoryリレーションが**ロード済みの場合のみ**出力します。`whenLoaded()` を使うことで、リレーションが未ロードの場合にN+1問題を引き起こすのを防ぎます。
+- `TagResource::collection($this->whenLoaded('tags'))`: tagsリレーションをTagResourceのコレクションとして出力します。
+- `created_at`, `updated_at`: Laravelが自動的にISO 8601形式（`2026-03-10T10:00:00.000000Z`）に変換します。
 
-#### 5.1.2 Contactモデルのテスト
+> **💡 `whenLoaded()` とは？**
+>
+> `whenLoaded('relation')` は、そのリレーションが `with()` で事前にロード（Eager Loading）されている場合にのみ値を返します。ロードされていない場合はキーごと省略されます。これにより、コントローラー側で `with()` を書き忘れた場合に、意図せずN+1クエリが発生するのを防げます。
+
+---
+
+## 4. API用FormRequestの作成 📝
+
+### 4-1. 一覧検索用: IndexContactRequest
+
+Web版の `IndexContactRequest` とは異なるバリデーションルールを定義します。
 
 ```bash
-sail artisan make:test Models/ContactTest --unit
+sail artisan make:request Api/V1/IndexContactRequest
 ```
 
-作成された`tests/Unit/Models/ContactTest.php`を以下のように編集します。
+作成された `app/Http/Requests/Api/V1/IndexContactRequest.php` を以下のように編集します。
 
-**tests/Unit/Models/ContactTest.php**
+**app/Http/Requests/Api/V1/IndexContactRequest.php**
 ```php
 <?php
 
-namespace Tests\Unit\Models;
+namespace App\Http\Requests\Api\V1;
 
-use App\Models\Category;
-use App\Models\Contact;
-use App\Models\Tag;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
+use Illuminate\Foundation\Http\FormRequest;
 
-class ContactTest extends TestCase
+class IndexContactRequest extends FormRequest
 {
-    use RefreshDatabase;
-
-    public function test_contact_belongs_to_category(): void
+    public function authorize(): bool
     {
-        $category = Category::factory()->create();
-        $contact = Contact::factory()->for($category)->create();
-
-        $this->assertTrue($contact->category->is($category));
+        return true;
     }
 
-    public function test_contact_belongs_to_many_tags(): void
+    public function rules(): array
     {
-        $contact = Contact::factory()->create();
-        $tags = Tag::factory()->count(2)->create();
-
-        $contact->tags()->attach($tags->pluck('id'));
-
-        $contact->load('tags');
-
-        $this->assertCount(2, $contact->tags);
-        $this->assertTrue($contact->tags->pluck('id')->contains($tags->first()->id));
-    }
-}
-```
-
-#### コード解説
-- `test_contact_belongs_to_category()`: `Contact`モデルが`category`リレーション（多対一）を正しく持っているかをテストします。
-- `$this->assertTrue($contact->category->is($category));`: 2つのモデルインスタンスが同じ（同じ主キーを持つ同じテーブルのレコード）であるかをアサートします。
-- `test_contact_belongs_to_many_tags()`: `Contact`モデルが`tags`リレーション（多対多）を正しく持っているかをテストします。
-- `$contact->tags()->attach($tags->pluck('id'));`: `Contact`に複数の`Tag`のIDを紐付けます。`pluck('id')`でIDの配列を取得しています。
-- `$contact->load('tags');`: リレーションを明示的に再読み込みし、最新の状態を取得します。
-- `$this->assertTrue($contact->tags->pluck('id')->contains($tags->first()->id));`: タグのIDコレクションに、紐付けたタグのIDが含まれていることを確認します。
-
-#### 5.1.3 Tagモデルのテスト
-
-```bash
-sail artisan make:test Models/TagTest --unit
-```
-
-作成された`tests/Unit/Models/TagTest.php`を以下のように編集します。
-
-**tests/Unit/Models/TagTest.php**
-```php
-<?php
-
-namespace Tests\Unit\Models;
-
-use App\Models\Contact;
-use App\Models\Tag;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
-
-class TagTest extends TestCase
-{
-    use RefreshDatabase;
-
-    public function test_tag_belongs_to_many_contacts(): void
-    {
-        $tag = Tag::factory()->create();
-        $contacts = Contact::factory()->count(2)->create();
-
-        $tag->contacts()->attach($contacts->pluck('id')->toArray());
-
-        $tag->load('contacts');
-
-        $this->assertCount(2, $tag->contacts);
-        $this->assertTrue($tag->contacts->pluck('id')->contains($contacts->first()->id));
-    }
-}
-```
-
-#### コード解説
-- `test_tag_belongs_to_many_contacts()`: `Tag`モデルが`contacts`リレーション（多対多）を正しく持っているかをテストします。
-
-### 5.2 Requests
-
-リクエストクラスのテストでは、バリデーションルールが意図通りに機能するかを確認します。
-
-#### 5.2.1 StoreContactRequestのテスト
-
-```bash
-sail artisan make:test Requests/StoreContactRequestTest --unit
-```
-
-作成された`tests/Unit/Requests/StoreContactRequestTest.php`を以下のように編集します。
-
-**tests/Unit/Requests/StoreContactRequestTest.php**
-```php
-<?php
-
-namespace Tests\Unit\Requests;
-
-use App\Http\Requests\StoreContactRequest;
-use App\Models\Category;
-use App\Models\Tag;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Validator;
-use Tests\TestCase;
-
-class StoreContactRequestTest extends TestCase
-{
-    use RefreshDatabase;
-
-    private function validator(array $data)
-    {
-        $request = new StoreContactRequest();
-
-        return Validator::make($data, $request->rules(), $request->messages());
-    }
-
-    private function basePayload(Category $category, array $overrides = []): array
-    {
-        return array_merge([
-            'first_name' => 'Hanako',
-            'last_name' => 'Sato',
-            'gender' => 2,
-            'email' => 'hanako@example.com',
-            'tel' => '0312345678',
-            'address' => 'Tokyo',
-            'building' => 'Skytree',
-            'category_id' => $category->id,
-            'detail' => 'テストお問い合わせ',
-        ], $overrides);
-    }
-
-    public function test_rules_accept_valid_payload_with_tags(): void
-    {
-        $category = Category::factory()->create();
-        $tags = Tag::factory()->count(2)->create();
-
-        $validator = $this->validator($this->basePayload($category, [
-            'tag_ids' => $tags->pluck('id')->toArray(),
-        ]));
-
-        $this->assertTrue($validator->passes());
-    }
-
-    public function test_rules_reject_invalid_phone_number(): void
-    {
-        $category = Category::factory()->create();
-
-        $validator = $this->validator($this->basePayload($category, [
-            'tel' => '123-456',
-        ]));
-
-        $this->assertTrue($validator->fails());
-        $this->assertArrayHasKey('tel', $validator->errors()->messages());
-    }
-}
-```
-
-#### コード解説
-- `validator()`: テスト対象の`StoreContactRequest`のインスタンスを作成し、その`rules()`メソッドを使ってバリデータを作成するヘルパーメソッドです。
-- `basePayload()`: テストの基本となる正常なデータ（ペイロード）を生成するヘルパーメソッドです。`$overrides`で一部のデータを上書きできます。
-- `test_rules_accept_valid_payload_with_tags()`: 正常なデータがバリデーションを通過すること（`passes()`）をテストします。
-- `test_rules_reject_invalid_phone_number()`: 不正な電話番号のデータがバリデーションに失敗すること（`fails()`）と、`tel`フィールドにエラーメッセージが存在すること（`assertArrayHasKey()`）をテストします。
-
-#### 5.2.2 IndexContactRequestのテスト
-
-```bash
-sail artisan make:test Requests/IndexContactRequestTest --unit
-```
-
-作成された`tests/Unit/Requests/IndexContactRequestTest.php`を以下のように編集します。
-
-**tests/Unit/Requests/IndexContactRequestTest.php**
-```php
-<?php
-
-namespace Tests\Unit\Requests;
-
-use App\Http\Requests\IndexContactRequest;
-use App\Models\Category;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Validator;
-use Tests\TestCase;
-
-class IndexContactRequestTest extends TestCase
-{
-    use RefreshDatabase;
-
-    private function validator(array $data)
-    {
-        $request = new IndexContactRequest();
-        return Validator::make($data, $request->rules(), $request->messages());
-    }
-
-    public function test_rules_accept_valid_filters(): void
-    {
-        $category = Category::factory()->create();
-
-        $validator = $this->validator([
-            'keyword' => 'Yamada',
-            'gender' => 1,
-            'category_id' => $category->id,
-            'date' => '2024-02-01',
-        ]);
-
-        $this->assertTrue($validator->passes());
-    }
-
-    public function test_rules_reject_invalid_gender(): void
-    {
-        $validator = $this->validator([
-            'gender' => 9,
-        ]);
-
-        $this->assertTrue($validator->fails());
-        $this->assertArrayHasKey('gender', $validator->errors()->messages());
-    }
-}
-```
-
-#### コード解説
-- `test_rules_accept_valid_filters()`: 検索条件として有効なデータがバリデーションを通過することをテストします。
-- `test_rules_reject_invalid_gender()`: 不正な性別値（`9`）がバリデーションに失敗し、`gender`フィールドにエラーが発生することをテストします。`IndexContactRequest`の`gender`ルールには`in:1,2,3`が含まれているため、範囲外の値は拒否されます。
-
-#### 5.2.3 ExportContactRequestのテスト
-
-```bash
-sail artisan make:test ExportContactRequestTest --unit
-```
-
-作成された`tests/Unit/ExportContactRequestTest.php`を以下のように編集します。
-
-**tests/Unit/ExportContactRequestTest.php**
-```php
-<?php
-
-namespace Tests\Unit;
-
-use App\Http\Requests\ExportContactRequest;
-use App\Models\Category;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Validator;
-use Tests\TestCase;
-
-class ExportContactRequestTest extends TestCase
-{
-    use RefreshDatabase;
-
-    private function makeValidator(array $data)
-    {
-        $request = new ExportContactRequest();
-
-        return Validator::make($data, $request->rules());
-    }
-
-    public function test_rules_accept_valid_payload(): void
-    {
-        $category = Category::factory()->create();
-
-        $validator = $this->makeValidator([
-            'keyword' => 'delivery',
-            'gender' => 1,
-            'category_id' => $category->id,
-            'date' => '2024-02-01',
-        ]);
-
-        $this->assertTrue($validator->passes());
-    }
-
-    public function test_gender_rule_rejects_invalid_value(): void
-    {
-        $category = Category::factory()->create();
-
-        $validator = $this->makeValidator([
-            'gender' => 5,
-            'category_id' => $category->id,
-        ]);
-
-        $this->assertTrue($validator->fails());
-        $this->assertArrayHasKey('gender', $validator->errors()->messages());
-    }
-
-    public function test_category_rule_requires_existing_identifier(): void
-    {
-        Category::factory()->create();
-
-        $validator = $this->makeValidator([
-            'category_id' => 999,
-        ]);
-
-        $this->assertTrue($validator->fails());
-        $this->assertArrayHasKey('category_id', $validator->errors()->messages());
-    }
-}
-```
-
-#### コード解説
-- `test_gender_rule_rejects_invalid_value()`: `gender`に不正な値（`in:1,2,3`に含まれない値）が指定された場合にバリデーションが失敗することをテストします。
-- `test_category_rule_requires_existing_identifier()`: `category_id`に存在しないIDが指定された場合にバリデーションが失敗すること（`exists:categories,id`）をテストします。
-
-#### 5.2.4 StoreTagRequestのテスト
-
-```bash
-sail artisan make:test Requests/StoreTagRequestTest --unit
-```
-
-作成された`tests/Unit/Requests/StoreTagRequestTest.php`を以下のように編集します。
-
-**tests/Unit/Requests/StoreTagRequestTest.php**
-```php
-<?php
-
-namespace Tests\Unit\Requests;
-
-use App\Http\Requests\StoreTagRequest;
-use App\Models\Tag;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Validator;
-use Tests\TestCase;
-
-class StoreTagRequestTest extends TestCase
-{
-    use RefreshDatabase;
-
-    private function validator(array $data)
-    {
-        $request = new StoreTagRequest();
-
-        return Validator::make($data, $request->rules());
-    }
-
-    public function test_rules_accept_valid_name(): void
-    {
-        $validator = $this->validator(['name' => 'new-tag']);
-
-        $this->assertTrue($validator->passes());
-    }
-
-    public function test_rules_reject_empty_name(): void
-    {
-        $validator = $this->validator(['name' => '']);
-
-        $this->assertTrue($validator->fails());
-        $this->assertArrayHasKey('name', $validator->errors()->messages());
-    }
-
-    public function test_rules_reject_name_exceeding_max_length(): void
-    {
-        $validator = $this->validator(['name' => str_repeat('a', 51)]);
-
-        $this->assertTrue($validator->fails());
-        $this->assertArrayHasKey('name', $validator->errors()->messages());
-    }
-
-    public function test_rules_reject_duplicate_name(): void
-    {
-        Tag::factory()->create(['name' => 'duplicate']);
-
-        $validator = $this->validator(['name' => 'duplicate']);
-
-        $this->assertTrue($validator->fails());
-        $this->assertArrayHasKey('name', $validator->errors()->messages());
-    }
-}
-```
-
-#### コード解説
-- `test_rules_reject_empty_name()`: `name`が空の場合にバリデーションが失敗すること（`required`）をテストします。
-- `test_rules_reject_name_exceeding_max_length()`: `name`が50文字を超える場合にバリデーションが失敗すること（`max:50`）をテストします。
-- `test_rules_reject_duplicate_name()`: `name`に既に存在するタグ名が指定された場合にバリデーションが失敗すること（`unique:tags,name`）をテストします。
-
-#### 5.2.5 UpdateTagRequestのテスト
-
-```bash
-sail artisan make:test Requests/UpdateTagRequestTest --unit
-```
-
-作成された`tests/Unit/Requests/UpdateTagRequestTest.php`を以下のように編集します。
-
-**tests/Unit/Requests/UpdateTagRequestTest.php**
-```php
-<?php
-
-namespace Tests\Unit\Requests;
-
-use App\Http\Requests\UpdateTagRequest;
-use App\Models\Tag;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Validator;
-use Tests\TestCase;
-
-class UpdateTagRequestTest extends TestCase
-{
-    use RefreshDatabase;
-
-    public function test_rules_allow_current_name_but_reject_duplicates(): void
-    {
-        $existing = Tag::factory()->create(['name' => 'existing']);
-        $target = Tag::factory()->create(['name' => 'current']);
-
-        $request = new class($target) extends UpdateTagRequest
-        {
-            public function __construct(private Tag $boundTag)
-            {
-            }
-
-            public function route($param = null, $default = null)
-            {
-                if ($param === 'tag') {
-                    return $this->boundTag;
-                }
-
-                return $default;
-            }
-        };
-
-        $currentValidator = Validator::make(['name' => 'current'], $request->rules());
-        $this->assertTrue($currentValidator->passes());
-
-        $duplicateValidator = Validator::make(['name' => 'existing'], $request->rules());
-        $this->assertTrue($duplicateValidator->fails());
-        $this->assertArrayHasKey('name', $duplicateValidator->errors()->messages());
-    }
-}
-```
-
-#### コード解説
-- このテストは少し複雑です。`UpdateTagRequest`の`unique`ルールは`unique:tags,name,{tag}`のように、更新対象のIDを除外する必要があります。これを単体テストで再現するために、無名クラスを使って`UpdateTagRequest`を拡張し、`route()`メソッドをオーバーライドして、テスト対象の`$target`モデルを注入しています。
-- `$currentValidator`: 更新対象自身の名前（`current`）を指定した場合は、バリデーションを通過することをテストします。
-- `$duplicateValidator`: 別の既存タグの名前（`existing`）を指定した場合は、バリデーションに失敗することをテストします。
-
-## 6. 機能テスト (Feature Tests) の作成 🚀
-
-いよいよ、ユーザーの操作を模した機能テストを実装していきます。ここでは、実際にHTTPリクエストを送信し、返ってきたレスポンスやデータベースの状態を検証します。
-
-### 6.1 Webページ関連
-
-#### 6.1.1 お問い合わせページのテスト
-
-```bash
-sail artisan make:test ContactPageTest
-```
-
-作成された`tests/Feature/ContactPageTest.php`を以下のように編集します。
-
-**tests/Feature/ContactPageTest.php**
-```php
-<?php
-
-namespace Tests\Feature;
-
-use App\Models\Category;
-use App\Models\Tag;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
-
-class ContactPageTest extends TestCase
-{
-    use RefreshDatabase;
-
-    public function test_contact_index_page_is_accessible(): void
-    {
-        $response = $this->get("/");
-
-        $response->assertOk();
-        $response->assertViewIs("contact.index");
-        $response->assertViewHas("categories");
-        $response->assertViewHas("tags");
-    }
-
-    public function test_contact_index_page_displays_categories_and_tags(): void
-    {
-        $category = Category::factory()->create(["content" => "Delivery"]);
-        $tag = Tag::factory()->create(["name" => "urgent"]);
-
-        $response = $this->get("/");
-
-        $response->assertOk();
-        $response->assertSee("Delivery");
-        $response->assertSee("urgent");
-    }
-
-    public function test_contact_thanks_page_is_accessible(): void
-    {
-        $response = $this->get("/thanks");
-
-        $response->assertOk();
-        $response->assertViewIs("contact.thanks");
-    }
-}
-```
-
-#### コード解説
-- `$this->get("/")`: アプリケーションのルートURL（`/`）に対してGETリクエストを送信します。
-- `$response->assertOk()`: レスポンスのHTTPステータスコードが200 OKであることをアサートします。
-- `$response->assertViewIs("contact.index")`: レスポンスとして`contact.index`ビューが返されたことをアサートします。
-- `$response->assertViewHas("categories")`: ビューに`categories`という変数が渡されていることをアサートします。コントローラーからビューへのデータの受け渡しが正しく行われているかを確認できます。
-- `$response->assertViewHas("tags")`: 同様に、`tags`変数がビューに渡されていることをアサートします。
-- `test_contact_index_page_displays_categories_and_tags()`: 実際にカテゴリとタグを作成し、ページのHTMLにそれらの名前が含まれていることを`assertSee`で確認します。これにより、データがビューに渡されるだけでなく、実際に画面に表示されることを保証します。
-- `test_contact_thanks_page_is_accessible()`: サンクスページ(`/thanks`)が正常に表示されることをテストします。
-
-#### 6.1.2 CSVエクスポート機能のテスト
-
-```bash
-sail artisan make:test ContactExportTest
-```
-
-作成された`tests/Feature/ContactExportTest.php`を以下のように編集します。
-
-**tests/Feature/ContactExportTest.php**
-```php
-<?php
-
-namespace Tests\Feature;
-
-use App\Models\Category;
-use App\Models\Contact;
-use App\Models\User;
-use Carbon\Carbon;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
-
-class ContactExportTest extends TestCase
-{
-    use RefreshDatabase;
-
-    public function test_authenticated_user_can_export_filtered_contacts(): void
-    {
-        $user = User::factory()->create();
-        $categoryA = Category::factory()->create(["content" => "Delivery"]);
-        $categoryB = Category::factory()->create(["content" => "Exchange"]);
-
-        Contact::factory()->for($categoryA)->create([
-            "first_name" => "John",
-            "last_name" => "Smith",
-            "gender" => 1,
-            "email" => "john@example.com",
-            "created_at" => Carbon::parse("2024-02-10 10:00:00"),
-        ]);
-
-        Contact::factory()->for($categoryB)->create([
-            "first_name" => "Alice",
-            "last_name" => "Jones",
-            "gender" => 2,
-            "email" => "alice@example.com",
-            "created_at" => Carbon::parse("2024-02-11 10:00:00"),
-        ]);
-
-        $response = $this->actingAs($user)->get("/contacts/export?keyword=Smith&gender=1&category_id=" . $categoryA->id . "&date=2024-02-10");
-
-        $response->assertOk();
-        $response->assertHeader("Content-Type", "text/csv; charset=UTF-8");
-
-        $content = $response->streamedContent();
-
-        $this->assertStringContainsString("John Smith", $content);
-        $this->assertStringContainsString($categoryA->content, $content);
-        $this->assertStringNotContainsString("Alice Jones", $content);
-    }
-
-    public function test_export_without_filters_returns_all_contacts_in_latest_order(): void
-    {
-        $user = User::factory()->create();
-
-        $older = Contact::factory()->create([
-            "first_name" => "Eve",
-            "last_name" => "Adams",
-            "created_at" => Carbon::parse("2024-02-01 08:00:00"),
-        ]);
-
-        $newer = Contact::factory()->create([
-            "first_name" => "Mark",
-            "last_name" => "Brown",
-            "created_at" => Carbon::parse("2024-02-02 08:00:00"),
-        ]);
-
-        $response = $this->actingAs($user)->get("/contacts/export");
-
-        $response->assertOk();
-        $content = $response->streamedContent();
-
-        $this->assertStringContainsString("Eve Adams", $content);
-        $this->assertStringContainsString("Mark Brown", $content);
-
-        $lines = array_values(array_filter(explode("\n", trim($content))));
-        $firstLine = ltrim($lines[0] ?? "", "\xEF\xBB\xBF");
-
-        $this->assertStringContainsString("Mark Brown", $firstLine);
-        $this->assertStringContainsString("Eve Adams", $lines[1] ?? "");
-    }
-}
-```
-
-#### コード解説
-- `test_authenticated_user_can_export_filtered_contacts()`: 検索条件でフィルタリングされた結果が正しくエクスポートされるかをテストします。
-- `$response->assertHeader("Content-Type", "text/csv; charset=UTF-8");`: レスポンスヘッダーがCSV形式であることを確認します。
-- `$content = $response->streamedContent();`: ストリーム形式で返されるレスポンスの内容を取得します。
-- `$this->assertStringContainsString(...)`: CSVの内容に、条件に一致するデータが含まれていることを確認します。
-- `$this->assertStringNotContainsString(...)`: CSVの内容に、条件に一致しないデータが含まれていないことを確認します。
-- `test_export_without_filters_returns_all_contacts_in_latest_order()`: フィルタを指定しない場合に、全てのデータが最新順でエクスポートされるかをテストします。
-- `explode("\n", trim($content))`: CSVの内容を改行で分割し、各行を配列として取得します。
-- `ltrim($lines[0] ?? "", "\xEF\xBB\xBF")`: 1行目の先頭にある可能性のあるBOM（バイトオーダーマーク）を除去します。
-- 1行目に最新のデータ（`Mark Brown`）が、2行目に古いデータ（`Eve Adams`）が含まれていることを確認し、ソート順を検証します。
-
-### 6.2 Webルートの機能テスト
-
-このセクションでは、Webルートを通じたコントローラーの動作を検証します。お問い合わせフォームの確認画面・保存処理、管理画面のCRUD操作、タグ管理など、ユーザーが実際に行う操作を再現してテストします。
-
-#### 6.2.1 お問い合わせコントローラーのテスト
-
-```bash
-sail artisan make:test ContactControllerTest
-```
-
-作成された`tests/Feature/ContactControllerTest.php`を以下のように編集します。
-
-**tests/Feature/ContactControllerTest.php**
-```php
-<?php
-
-namespace Tests\Feature;
-
-use App\Models\Category;
-use App\Models\Contact;
-use App\Models\Tag;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
-
-class ContactControllerTest extends TestCase
-{
-    use RefreshDatabase;
-
-    public function test_confirm_displays_validated_data(): void
-    {
-        $category = Category::factory()->create(['content' => 'Support']);
-        $tags = Tag::factory()->count(2)->create();
-
-        $payload = [
-            'first_name' => 'Taro',
-            'last_name' => 'Yamada',
-            'gender' => 1,
-            'email' => 'taro@example.com',
-            'tel' => '09012345678',
-            'address' => 'Tokyo',
-            'building' => 'Sunshine 60',
-            'category_id' => $category->id,
-            'detail' => 'テスト内容',
-            'tag_ids' => $tags->pluck('id')->toArray(),
+        return [
+            'keyword' => ['nullable', 'string', 'max:255'],
+            'gender' => ['nullable', 'integer', 'in:1,2,3'],
+            'category_id' => ['nullable', 'integer', 'exists:categories,id'],
+            'date' => ['nullable', 'date'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ];
-
-        $response = $this->post('/contacts/confirm', $payload);
-
-        $response->assertOk();
-        $response->assertViewIs('contact.confirm');
-        $response->assertSee('Taro');
-        $response->assertSee('Yamada');
-        $response->assertSee('taro@example.com');
-        $response->assertSee('Support');
     }
 
-    public function test_confirm_validation_error_redirects_back(): void
+    public function messages(): array
     {
-        $response = $this->post('/contacts/confirm', []);
-
-        $response->assertRedirect();
-        $response->assertSessionHasErrors(['first_name', 'last_name', 'email', 'tel', 'address', 'category_id', 'detail']);
-    }
-
-    public function test_store_persists_contact_and_redirects_to_thanks(): void
-    {
-        $category = Category::factory()->create();
-        $tags = Tag::factory()->count(2)->create();
-
-        $payload = [
-            'first_name' => 'Taro',
-            'last_name' => 'Yamada',
-            'gender' => 1,
-            'email' => 'taro@example.com',
-            'tel' => '0312345678',
-            'address' => 'Tokyo',
-            'building' => 'Sunshine 60',
-            'category_id' => $category->id,
-            'detail' => 'お問い合わせ内容です',
-            'tag_ids' => $tags->pluck('id')->toArray(),
+        return [
+            'keyword.max' => 'キーワードは255文字以内で入力してください',
+            'gender.in' => '性別の値が不正です',
+            'category_id.exists' => '選択されたカテゴリーが存在しません',
+            'date.date' => '日付の形式が正しくありません',
+            'per_page.max' => '1ページあたりの件数は100件以内で指定してください',
         ];
+    }
+}
+```
 
-        $response = $this->post('/contacts', $payload);
+#### Web版との差異
 
-        $response->assertRedirect('/thanks');
+| 項目 | Web版 (`App\Http\Requests`) | API版 (`App\Http\Requests\Api\V1`) |
+|---|---|---|
+| 名前空間 | `App\Http\Requests` | `App\Http\Requests\Api\V1` |
+| gender | `in:0,1,2,3`（0=全て） | `in:1,2,3`（省略=全て） |
+| per_page | なし（固定7件） | `min:1, max:100`（デフォルト20件） |
+| page | なし | `min:1` |
 
-        $this->assertDatabaseHas('contacts', [
-            'email' => 'taro@example.com',
-            'category_id' => $category->id,
-        ]);
+Web版ではHTMLのselectボックスで「全て（0）」を送信しますが、APIではパラメータを省略することで「全て」を表現します。
 
-        $contact = Contact::where('email', 'taro@example.com')->first();
-        foreach ($tags as $tag) {
-            $this->assertDatabaseHas('contact_tag', [
-                'contact_id' => $contact->id,
-                'tag_id' => $tag->id,
-            ]);
+### 4-2. 作成用: StoreContactRequest
+
+```bash
+sail artisan make:request Api/V1/StoreContactRequest
+```
+
+作成された `app/Http/Requests/Api/V1/StoreContactRequest.php` を以下のように編集します。
+
+**app/Http/Requests/Api/V1/StoreContactRequest.php**
+```php
+<?php
+
+namespace App\Http\Requests\Api\V1;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class StoreContactRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            'first_name' => ['required', 'string', 'max:255'],
+            'last_name' => ['required', 'string', 'max:255'],
+            'gender' => ['required', 'integer', 'in:1,2,3'],
+            'email' => ['required', 'string', 'email', 'max:255'],
+            'tel' => ['required', 'string', 'regex:/^[0-9]{10,11}$/'],
+            'address' => ['required', 'string', 'max:255'],
+            'building' => ['nullable', 'string', 'max:255'],
+            'category_id' => ['required', 'integer', 'exists:categories,id'],
+            'detail' => ['required', 'string', 'max:120'],
+            'tag_ids' => ['nullable', 'array'],
+            'tag_ids.*' => ['integer', 'exists:tags,id'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'first_name.required' => '姓を入力してください',
+            'last_name.required' => '名を入力してください',
+            'gender.required' => '性別を選択してください',
+            'email.required' => 'メールアドレスを入力してください',
+            'email.email' => 'メールアドレスの形式で入力してください',
+            'tel.required' => '電話番号を入力してください',
+            'tel.regex' => '電話番号はハイフンなしの10〜11桁で入力してください',
+            'address.required' => '住所を入力してください',
+            'category_id.required' => 'お問い合わせの種類を選択してください',
+            'detail.required' => 'お問い合わせ内容を入力してください',
+            'detail.max' => 'お問い合わせ内容は120文字以内で入力してください',
+        ];
+    }
+}
+```
+
+バリデーションルール自体はWeb版の `StoreContactRequest` と同一ですが、**名前空間が異なります**。Web版とAPI版で将来的にルールが分岐する可能性を考慮し、別クラスとして作成しています。
+
+### 4-3. 更新用: UpdateContactRequest
+
+```bash
+sail artisan make:request Api/V1/UpdateContactRequest
+```
+
+作成された `app/Http/Requests/Api/V1/UpdateContactRequest.php` を以下のように編集します。StoreContactRequestと同一のルールです。更新時もすべてのフィールドを必須とするフルリプレース方式（PUT）を採用しています。
+
+**app/Http/Requests/Api/V1/UpdateContactRequest.php**
+
+```php
+<?php
+
+namespace App\Http\Requests\Api\V1;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class UpdateContactRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            'first_name' => ['required', 'string', 'max:255'],
+            'last_name' => ['required', 'string', 'max:255'],
+            'gender' => ['required', 'integer', 'in:1,2,3'],
+            'email' => ['required', 'string', 'email', 'max:255'],
+            'tel' => ['required', 'string', 'regex:/^[0-9]{10,11}$/'],
+            'address' => ['required', 'string', 'max:255'],
+            'building' => ['nullable', 'string', 'max:255'],
+            'category_id' => ['required', 'integer', 'exists:categories,id'],
+            'detail' => ['required', 'string', 'max:120'],
+            'tag_ids' => ['nullable', 'array'],
+            'tag_ids.*' => ['integer', 'exists:tags,id'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'first_name.required' => '姓を入力してください',
+            'last_name.required' => '名を入力してください',
+            'gender.required' => '性別を選択してください',
+            'email.required' => 'メールアドレスを入力してください',
+            'email.email' => 'メールアドレスの形式で入力してください',
+            'tel.required' => '電話番号を入力してください',
+            'tel.regex' => '電話番号はハイフンなしの10〜11桁で入力してください',
+            'address.required' => '住所を入力してください',
+            'category_id.required' => 'お問い合わせの種類を選択してください',
+            'detail.required' => 'お問い合わせ内容を入力してください',
+            'detail.max' => 'お問い合わせ内容は120文字以内で入力してください',
+        ];
+    }
+}
+```
+
+> **💡 PUTとPATCHの違い**
+>
+> REST APIでは、`PUT` はリソースの**全体置換**、`PATCH` は**部分更新**を意味します。今回は `PUT` を採用しているため、更新時もすべてのフィールドを送信する必要があります。`PATCH` を使う場合は、各ルールを `sometimes` にして「送信されたフィールドのみバリデーション」にする設計もあります。
+
+---
+
+## 5. API用コントローラーの作成 🎮
+
+API用のコントローラーは `Api\V1` 名前空間に配置し、Web用コントローラーと完全に分離します。
+
+```bash
+sail artisan make:controller Api/V1/ContactController
+```
+
+作成された `app/Http/Controllers/Api/V1/ContactController.php` を以下のように編集します。
+
+**app/Http/Controllers/Api/V1/ContactController.php**
+```php
+<?php
+
+namespace App\Http\Controllers\Api\V1;
+
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\IndexContactRequest;
+use App\Http\Requests\Api\V1\StoreContactRequest;
+use App\Http\Requests\Api\V1\UpdateContactRequest;
+use App\Http\Resources\ContactResource;
+use App\Models\Contact;
+
+class ContactController extends Controller
+{
+    public function index(IndexContactRequest $request)
+    {
+        $query = Contact::with(['category', 'tags']);
+
+        if ($request->filled('keyword')) {
+            $keyword = $request->keyword;
+            $query->where(function ($q) use ($keyword) {
+                $q->where('first_name', 'like', "%{$keyword}%")
+                    ->orWhere('last_name', 'like', "%{$keyword}%")
+                    ->orWhere('email', 'like', "%{$keyword}%");
+            });
         }
+
+        if ($request->filled('gender')) {
+            $query->where('gender', $request->gender);
+        }
+
+        if ($request->filled('category_id')) {
+            $query->where('category_id', $request->category_id);
+        }
+
+        if ($request->filled('date')) {
+            $query->whereDate('created_at', $request->date);
+        }
+
+        $perPage = $request->input('per_page', 20);
+        $contacts = $query->latest()->paginate($perPage);
+
+        return ContactResource::collection($contacts);
     }
 
-    public function test_store_validation_error_redirects_back(): void
+    public function show(Contact $contact)
     {
-        $response = $this->post('/contacts', []);
+        $contact->load(['category', 'tags']);
 
-        $response->assertRedirect();
-        $response->assertSessionHasErrors(['first_name', 'last_name', 'email', 'tel', 'address', 'category_id', 'detail']);
+        return new ContactResource($contact);
+    }
+
+    public function store(StoreContactRequest $request)
+    {
+        $validated = $request->validated();
+        $tagIds = $validated['tag_ids'] ?? [];
+        unset($validated['tag_ids']);
+
+        $contact = Contact::create($validated);
+
+        if (! empty($tagIds)) {
+            $contact->tags()->attach($tagIds);
+        }
+
+        $contact->load(['category', 'tags']);
+
+        return (new ContactResource($contact))
+            ->response()
+            ->setStatusCode(201);
+    }
+
+    public function update(UpdateContactRequest $request, Contact $contact)
+    {
+        $validated = $request->validated();
+        $tagIds = $validated['tag_ids'] ?? [];
+        unset($validated['tag_ids']);
+
+        $contact->update($validated);
+        $contact->tags()->sync($tagIds);
+
+        $contact->load(['category', 'tags']);
+
+        return new ContactResource($contact);
+    }
+
+    public function destroy(Contact $contact)
+    {
+        $contact->delete();
+
+        return response()->json(null, 204);
     }
 }
 ```
 
-#### コード解説
-- `test_confirm_displays_validated_data()`: 確認画面へのPOSTリクエストが成功し、`contact.confirm`ビューが表示されることをテストします。
-  - `$this->post('/contacts/confirm', $payload)`: 確認画面のURLにPOSTリクエストを送信します。
-  - `$response->assertViewIs('contact.confirm')`: 確認画面のビューが返されたことを確認します。
-  - `$response->assertSee('Taro')`, `assertSee('Yamada')` 等: 送信したデータが確認画面に表示されていることを確認します。
-- `test_confirm_validation_error_redirects_back()`: 空のデータで確認画面にPOSTした場合、バリデーションエラーで元の画面にリダイレクトされることをテストします。
-  - `$response->assertSessionHasErrors([...])`: セッションに特定のフィールドのバリデーションエラーが存在することをアサートします。
-- `test_store_persists_contact_and_redirects_to_thanks()`: お問い合わせデータの保存が成功し、サンクスページにリダイレクトされることをテストします。
-  - `$this->post('/contacts', $payload)`: お問い合わせ保存のURLにPOSTリクエストを送信します。
-  - `$response->assertRedirect('/thanks')`: サンクスページへリダイレクトされることを確認します。
-  - `$this->assertDatabaseHas('contacts', ...)`: データベースにお問い合わせデータが保存されたことを確認します。
-  - `$this->assertDatabaseHas('contact_tag', ...)`: 中間テーブルにタグの紐付けが保存されたことを確認します。
-- `test_store_validation_error_redirects_back()`: 空のデータで保存を試みた場合、バリデーションエラーでリダイレクトされることをテストします。
+### コード解説
 
-#### 6.2.2 管理画面コントローラーのテスト
+#### indexメソッド（一覧取得）
+- Web版の `AdminController@index` と検索ロジックは同じですが、Bladeビューではなく `ContactResource::collection()` でJSON応答を返します。
+- `paginate($perPage)` により、Laravelが自動的に `data` 配列と `meta`（ページネーション情報）をJSON応答に含めます。
+- Web版はgenderが `0` のとき全件表示ですが、API版はgenderパラメータを**省略**することで全件表示になります。
 
-```bash
-sail artisan make:test AdminControllerTest
-```
+#### showメソッド（詳細取得）
+- `Contact $contact` でルートモデルバインディングを使用し、存在しないIDの場合は自動的に404例外がスローされます。
+- `$contact->load(['category', 'tags'])` でリレーションをEager Loadingし、`new ContactResource($contact)` でJSON変換します。
 
-作成された`tests/Feature/AdminControllerTest.php`を以下のように編集します。
+#### storeメソッド（新規作成）
+- Web版の `ContactController@store` と同じビジネスロジック（Contact作成 + タグ紐付け）ですが、リダイレクトの代わりに**201 Created** ステータスでJSONレスポンスを返します。
+- `->response()->setStatusCode(201)` でHTTPステータスコードを明示的に設定しています。
 
-**tests/Feature/AdminControllerTest.php**
-```php
-<?php
+#### updateメソッド（更新）
+- `$contact->update($validated)` でモデルを更新します。
+- `$contact->tags()->sync($tagIds)` で、タグの関連を **同期** します。`attach()` は追加のみですが、`sync()` は「指定されたIDだけが関連付けられた状態」にします（不要な関連は自動削除）。
 
-namespace Tests\Feature;
+#### destroyメソッド（削除）
+- `$contact->delete()` でレコードを削除し、**204 No Content**（レスポンスボディなし）を返します。
+- 204はREST APIにおいて「処理は成功したが、返すデータはない」ことを意味するステータスコードです。
 
-use App\Models\Category;
-use App\Models\Contact;
-use App\Models\Tag;
-use App\Models\User;
-use Carbon\Carbon;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
-
-class AdminControllerTest extends TestCase
-{
-    use RefreshDatabase;
-
-    public function test_authenticated_user_can_view_admin_dashboard(): void
-    {
-        $user = User::factory()->create();
-
-        $response = $this->actingAs($user)->get('/admin');
-
-        $response->assertOk();
-        $response->assertViewIs('admin.index');
-    }
-
-    public function test_unauthenticated_user_is_redirected_to_login(): void
-    {
-        $response = $this->get('/admin');
-
-        $response->assertRedirect('/login');
-    }
-
-    public function test_index_displays_contacts_with_filter(): void
-    {
-        $user = User::factory()->create();
-        $category = Category::factory()->create(['content' => 'Delivery']);
-
-        $matching = Contact::factory()->for($category)->create([
-            'first_name' => 'Ken',
-            'last_name' => 'Ito',
-            'gender' => 1,
-            'email' => 'ken@example.com',
-            'created_at' => Carbon::parse('2024-02-01 09:00:00'),
-        ]);
-
-        Contact::factory()->create([
-            'first_name' => 'Jane',
-            'last_name' => 'Smith',
-            'gender' => 2,
-            'email' => 'jane@example.com',
-            'created_at' => Carbon::parse('2024-02-02 09:00:00'),
-        ]);
-
-        $response = $this->actingAs($user)->get('/admin?keyword=Ken&gender=1&category_id=' . $category->id . '&date=2024-02-01');
-
-        $response->assertOk();
-        $response->assertSee('Ken');
-        $response->assertDontSee('Jane');
-    }
-
-    public function test_index_paginates_results(): void
-    {
-        $user = User::factory()->create();
-        Contact::factory()->count(10)->create();
-
-        $response = $this->actingAs($user)->get('/admin');
-
-        $response->assertOk();
-        $response->assertViewHas('contacts');
-        $this->assertEquals(7, $response->viewData('contacts')->count());
-    }
-
-    public function test_show_displays_contact_detail(): void
-    {
-        $user = User::factory()->create();
-        $category = Category::factory()->create(['content' => 'Support']);
-        $contact = Contact::factory()->for($category)->create([
-            'first_name' => 'Mika',
-            'last_name' => 'Suzuki',
-        ]);
-
-        $response = $this->actingAs($user)->get('/admin/contacts/' . $contact->id);
-
-        $response->assertOk();
-        $response->assertViewIs('admin.show');
-        $response->assertSee('Mika');
-        $response->assertSee('Suzuki');
-        $response->assertSee('Support');
-    }
-
-    public function test_destroy_removes_contact_and_redirects(): void
-    {
-        $user = User::factory()->create();
-        $contact = Contact::factory()->create();
-
-        $response = $this->actingAs($user)->delete('/admin/contacts/' . $contact->id);
-
-        $response->assertRedirect('/admin');
-        $this->assertDatabaseMissing('contacts', ['id' => $contact->id]);
-    }
-}
-```
-
-#### コード解説
-- `test_authenticated_user_can_view_admin_dashboard()`: 認証済みのユーザーが`/admin`にアクセスし、`admin.index`ビューが返されることをテストしています。
-  - `$this->actingAs($user)->get('/admin')`: `actingAs()`で指定したユーザーとしてログインした状態でリクエストを送信します。
-- `test_unauthenticated_user_is_redirected_to_login()`: 未認証のユーザーが`/admin`にアクセスした場合、ログインページにリダイレクトされることをテストします。
-  - `$response->assertRedirect("/login")`: `/login`へのリダイレクトが発生したことをアサートします。認証ミドルウェアが正しく機能していることを確認できます。
-- `test_index_displays_contacts_with_filter()`: キーワード・性別・カテゴリ・日付の全フィルタを指定して管理画面にアクセスし、検索結果が正しく表示されることをテストします。
-  - `$response->assertSee('Ken')`: レスポンスのHTML内に指定した文字列が含まれていることをアサートします。
-  - `$response->assertDontSee('Jane')`: フィルタ条件に合致しないデータが表示されていないことを確認します。
-- `test_index_paginates_results()`: 10件のデータを作成し、ページネーションで1ページ目に7件が表示されることをテストします。
-  - `$this->assertEquals(7, $response->viewData('contacts')->count())`: ビューに渡されたコレクションの件数を検証します。
-- `test_show_displays_contact_detail()`: 個別のお問い合わせ詳細画面が正しく表示されることをテストします。`/admin/contacts/{id}`のURLでアクセスします。
-  - `$response->assertViewIs('admin.show')`: 正しいビューが返されることを確認します。
-  - `$response->assertSee('Support')`: カテゴリ名が画面に表示されていることを確認します。
-- `test_destroy_removes_contact_and_redirects()`: お問い合わせの削除が成功し、管理画面にリダイレクトされることをテストします。
-  - `$this->actingAs($user)->delete('/admin/contacts/' . $contact->id)`: DELETEリクエストを送信してお問い合わせを削除します。
-  - `$response->assertRedirect('/admin')`: 削除後に管理画面にリダイレクトされることを確認します。
-  - `$this->assertDatabaseMissing('contacts', ...)`: データベースからお問い合わせデータが正しく削除されたことを確認します。
-
-#### 6.2.3 タグコントローラーのテスト
-
-```bash
-sail artisan make:test TagControllerTest
-```
-
-作成された`tests/Feature/TagControllerTest.php`を以下のように編集します。
-
-**tests/Feature/TagControllerTest.php**
-```php
-<?php
-
-namespace Tests\Feature;
-
-use App\Models\Tag;
-use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
-
-class TagControllerTest extends TestCase
-{
-    use RefreshDatabase;
-
-    public function test_authenticated_user_can_create_tag(): void
-    {
-        $user = User::factory()->create();
-
-        $response = $this->actingAs($user)->post('/admin/tags', ['name' => 'priority']);
-
-        $response->assertRedirect('/admin');
-        $this->assertDatabaseHas('tags', ['name' => 'priority']);
-    }
-
-    public function test_authenticated_user_can_update_tag(): void
-    {
-        $user = User::factory()->create();
-        $tag = Tag::factory()->create(['name' => 'initial']);
-
-        $response = $this->actingAs($user)->put('/admin/tags/' . $tag->id, ['name' => 'updated']);
-
-        $response->assertRedirect('/admin');
-        $this->assertDatabaseHas('tags', ['id' => $tag->id, 'name' => 'updated']);
-    }
-
-    public function test_authenticated_user_can_delete_tag(): void
-    {
-        $user = User::factory()->create();
-        $tag = Tag::factory()->create();
-
-        $response = $this->actingAs($user)->delete('/admin/tags/' . $tag->id);
-
-        $response->assertRedirect('/admin');
-        $this->assertDatabaseMissing('tags', ['id' => $tag->id]);
-    }
-
-    public function test_unauthenticated_user_cannot_create_tag(): void
-    {
-        $response = $this->post('/admin/tags', ['name' => 'priority']);
-
-        $response->assertRedirect('/login');
-    }
-}
-```
-
-#### コード解説
-- `test_authenticated_user_can_create_tag()`: 認証済みのユーザーがタグを作成できることをテストします。
-  - `$this->actingAs($user)->post('/admin/tags', ['name' => 'priority'])`: ログイン状態でPOSTリクエストを送信し、タグを作成します。
-  - `$response->assertRedirect('/admin')`: 作成後に管理画面にリダイレクトされることを確認します。
-  - `$this->assertDatabaseHas('tags', ['name' => 'priority'])`: データベースに新しいタグが保存されたことを確認します。
-- `test_authenticated_user_can_update_tag()`: 認証済みのユーザーがタグ名を更新できることをテストします。
-  - `$this->actingAs($user)->put('/admin/tags/' . $tag->id, ['name' => 'updated'])`: PUTリクエストでタグを更新します。
-  - `$this->assertDatabaseHas('tags', ['id' => $tag->id, 'name' => 'updated'])`: データベースのタグ名が正しく更新されたことを確認します。
-- `test_authenticated_user_can_delete_tag()`: 認証済みのユーザーがタグを削除できることをテストします。
-  - `$this->actingAs($user)->delete('/admin/tags/' . $tag->id)`: DELETEリクエストでタグを削除します。
-  - `$this->assertDatabaseMissing('tags', ['id' => $tag->id])`: データベースからタグが削除されたことを確認します。
-- `test_unauthenticated_user_cannot_create_tag()`: 未認証のユーザーがタグを作成しようとした場合、ログインページにリダイレクトされることをテストします。
-  - `$response->assertRedirect('/login')`: 認証ミドルウェアによりログインページにリダイレクトされることを確認します。
-
-> **💡 SSRアプリケーションにおけるテストのポイント**
+> **💡 HTTPステータスコードの使い分け**
 >
-> 従来のLaravel SSR（サーバーサイドレンダリング）アプリケーションでは、APIとは異なるテストパターンが重要になります。
->
-> | パターン | 使い方 | 検証内容 |
+> | コード | 意味 | 使用場面 |
 > |---|---|---|
-> | `$this->post('/contacts/confirm', $payload)` | フォーム送信のシミュレート | `assertOk()` + `assertViewIs()` で確認画面の表示を検証 |
-> | `$this->post('/contacts', $payload)` | データ保存のシミュレート | `assertRedirect('/thanks')` でリダイレクト先を検証 |
-> | `$this->actingAs($user)->get('/admin')` | 認証付きページアクセス | `assertViewHas('contacts')` でビューへのデータ受け渡しを検証 |
-> | `$this->actingAs($user)->delete(...)` | 認証付き削除操作 | `assertRedirect('/admin')` + `assertDatabaseMissing()` で削除とリダイレクトを検証 |
-> | `$this->get('/admin')` (未認証) | 認証ガードの検証 | `assertRedirect('/login')` で未認証時のリダイレクトを検証 |
+> | 200 OK | 成功 | 取得・更新成功時 |
+> | 201 Created | 作成成功 | 新規リソース作成時 |
+> | 204 No Content | 成功（ボディなし） | 削除成功時 |
+> | 404 Not Found | 未検出 | リソースが存在しない時 |
+> | 422 Unprocessable Entity | バリデーションエラー | 入力値が不正な時 |
+
+---
+
+## 6. ルート定義 🛤️
+
+APIルートは `routes/api.php` に定義します。
+
+**routes/api.php**
+```php
+<?php
+
+use App\Http\Controllers\Api\V1\ContactController;
+use Illuminate\Support\Facades\Route;
+
+Route::prefix('v1')->group(function () {
+    Route::apiResource('contacts', ContactController::class);
+});
+```
+
+### コード解説
+
+- `Route::prefix('v1')`: URLに `/v1` プレフィックスを追加します。
+- `Route::apiResource('contacts', ...)`: RESTfulな5つのルート（index, show, store, update, destroy）を一括定義します。`Route::resource()` との違いは、`create` と `edit`（HTMLフォーム表示用）が含まれないことです。
+
+> **💡 `/api` プレフィックスの自動付与**
 >
-> APIテスト（`getJson`, `postJson`, `assertCreated`, `assertNoContent`等）とは異なり、SSRテストでは **ビューの表示** (`assertViewIs`, `assertViewHas`, `assertSee`) と **リダイレクト** (`assertRedirect`) が主要なアサーションとなります。
+> `routes/api.php` に定義したルートには、Laravelが自動的に `/api` プレフィックスを付与します。そのため、`prefix('v1')` の `apiResource('contacts')` は、実際には `/api/v1/contacts` というURLになります。
+>
+> この設定は `app/Providers/RouteServiceProvider.php` の `boot()` メソッドで行われています。
 
-## 7. テストの実行 🏁
+### ルーティングの確認
 
-全てのテストコードを書き終えたら、いよいよ実行です。以下のコマンドをターミナルで実行してください。
+定義したルートを確認するには、以下のコマンドを実行します。
 
 ```bash
-sail artisan test
+sail artisan route:list --path=api
 ```
 
-このコマンドは、`tests`ディレクトリ配下の全てのテストを自動で検出し、実行します。
-
-実行結果が以下のように、全て「PASS」となれば成功です！
+以下のようなルートが表示されるはずです。
 
 ```
-   PASS  Tests\Unit\ExportContactRequestTest
-   ✓ rules accept valid payload
-   ✓ gender rule rejects invalid value
-   ✓ category rule requires existing identifier
-
-   PASS  Tests\Unit\Models\CategoryTest
-   ✓ category has many contacts
-
-   PASS  Tests\Unit\Models\ContactTest
-   ✓ contact belongs to category
-   ✓ contact belongs to many tags
-
-   PASS  Tests\Unit\Models\TagTest
-   ✓ tag belongs to many contacts
-
-   PASS  Tests\Unit\Requests\IndexContactRequestTest
-   ✓ rules accept valid filters
-   ✓ rules reject invalid gender
-
-   PASS  Tests\Unit\Requests\StoreContactRequestTest
-   ✓ rules accept valid payload with tags
-   ✓ rules reject invalid phone number
-
-   PASS  Tests\Unit\Requests\StoreTagRequestTest
-   ✓ rules accept valid name
-   ✓ rules reject empty name
-   ✓ rules reject name exceeding max length
-   ✓ rules reject duplicate name
-
-   PASS  Tests\Unit\Requests\UpdateTagRequestTest
-   ✓ rules allow current name but reject duplicates
-
-   PASS  Tests\Feature\AdminControllerTest
-   ✓ authenticated user can view admin dashboard
-   ✓ unauthenticated user is redirected to login
-   ✓ index displays contacts with filter
-   ✓ index paginates results
-   ✓ show displays contact detail
-   ✓ destroy removes contact and redirects
-
-   PASS  Tests\Feature\ContactControllerTest
-   ✓ confirm displays validated data
-   ✓ confirm validation error redirects back
-   ✓ store persists contact and redirects to thanks
-   ✓ store validation error redirects back
-
-   PASS  Tests\Feature\ContactExportTest
-   ✓ authenticated user can export filtered contacts
-   ✓ export without filters returns all contacts in latest order
-
-   PASS  Tests\Feature\ContactPageTest
-   ✓ contact index page is accessible
-   ✓ contact index page displays categories and tags
-   ✓ contact thanks page is accessible
-
-   PASS  Tests\Feature\TagControllerTest
-   ✓ authenticated user can create tag
-   ✓ authenticated user can update tag
-   ✓ authenticated user can delete tag
-   ✓ unauthenticated user cannot create tag
-
-  Tests:  35 passed
-  Time:   1.50s
+  GET|HEAD  api/v1/contacts ............ contacts.index
+  POST      api/v1/contacts ............ contacts.store
+  GET|HEAD  api/v1/contacts/{contact} .. contacts.show
+  PUT|PATCH api/v1/contacts/{contact} .. contacts.update
+  DELETE    api/v1/contacts/{contact} .. contacts.destroy
 ```
 
-もし失敗したテスト（FAIL）があれば、エラーメッセージをよく読んで、テストコードまたはアプリケーションコードのどちらに問題があるのかを特定し、修正してください。
+---
 
-> **💡 `deprecated` の警告が表示される場合**
->
-> PHP 8.5環境では、テスト結果に `DEPR`（deprecated）や `Constant PDO::MYSQL_ATTR_SSL_CA is deprecated` という警告が表示されることがあります。これはテストコードの問題ではなく、Laravelのデフォルト設定ファイル（`config/database.php`）がPHP 8.5で非推奨となった定数を使用しているために発生します。テスト自体は正常にパスしているため、無視して問題ありません。
+## 7. 404エラーハンドリング 🚨
 
-### テストカバレッジの確認
+存在しないIDにアクセスした場合、カスタムエラーメッセージをJSON形式で返すようにします。
 
-全てのテストがパスしたら、テストカバレッジ（テストがアプリケーションコードのどの程度をカバーしているか）を確認しましょう。以下のコマンドを実行してください。
+**app/Exceptions/Handler.php** に `render()` メソッドを追加します。
+
+```php
+<?php
+
+namespace App\Exceptions;
+
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Http\Request;
+use Throwable;
+
+class Handler extends ExceptionHandler
+{
+    /**
+     * The list of the inputs that are never flashed to the session on validation exceptions.
+     *
+     * @var array<int, string>
+     */
+    protected $dontFlash = [
+        'current_password',
+        'password',
+        'password_confirmation',
+    ];
+
+    /**
+     * Register the exception handling callbacks for the application.
+     */
+    public function register(): void
+    {
+        $this->reportable(function (Throwable $e) {
+            //
+        });
+    }
+
+    /**
+     * Render an exception into an HTTP response.
+     */
+    public function render($request, Throwable $e)
+    {
+        if ($request->is('api/*') && $e instanceof ModelNotFoundException) {
+            return response()->json([
+                'error' => 'お問い合わせが見つかりませんでした。',
+            ], 404);
+        }
+
+        return parent::render($request, $e);
+    }
+}
+```
+
+### コード解説
+
+- `render()` メソッドをオーバーライドし、例外のレスポンス変換をカスタマイズしています。
+- `$e instanceof ModelNotFoundException`: ルートモデルバインディングでモデルが見つからない場合、Laravelは `ModelNotFoundException` をスローします。この例外を直接捕捉してJSON応答を返します。
+- `$request->is('api/*')`: APIリクエスト（`/api/` で始まるURL）の場合のみカスタムレスポンスを返します。Web画面のリクエストには影響しません。
+- `return parent::render($request, $e)`: 上記の条件に合致しない例外は、親クラスのデフォルト処理に委譲します。
+
+Handler.phpを編集した後は、以下のコマンドを実行してキャッシュをクリアしてください。Docker/Sail環境では、PHPのOPcache（コンパイル済みコードのキャッシュ）が古いコードを保持し続けることがあり、編集が反映されない場合があります。
 
 ```bash
-sail artisan test --coverage
+sail artisan optimize:clear
 ```
 
-要件シートでは**70%超**が目安とされています。カバレッジはあくまで参考指標ですので、全てのテストがパスしていれば問題ありません。
+---
 
-## 8. まとめ ✨
+## 8. 動作確認（Postman） 🔍
 
-お疲れ様でした！このチャプターでは、Laravelの自動テスト機能を網羅的に学び、アプリケーションの品質をコードで保証する方法を習得しました。
+実装したAPIが正しく動作するか、Postmanを使って確認しましょう。
 
-- **Factory**でテストデータを効率的に生成し、
-- **単体テスト**でモデル、リクエストといった個々の部品の動作を保証し、
-- **機能テスト**でユーザーの操作に基づいた一連の機能が正しく連携して動作することを証明しました。
+### 8-1. 一覧取得: GET /api/v1/contacts
 
-自動テストは、一度書けば何度でも同じ検証を瞬時に実行してくれます。これにより、機能追加やリファクタリングを行った際に、意図せず既存の機能を壊してしまう「デグレード」を恐れることなく、自信を持って開発を進めることができます。
+1. Postmanで「New Request」を作成します。
+2. HTTPメソッドを **GET** に設定します。
+3. URLに `http://localhost/api/v1/contacts` を入力します。
+4. 「Send」ボタンをクリックします。
 
-これで、あなたはお問い合わせ管理システムの全ての機能を実装し、その品質を保証するテストコードまで書き上げました。これは、プロのWebアプリケーションエンジニアとしての非常に重要なスキルセットです。
+**確認ポイント:**
+- ステータスコードが **200 OK** であること
+- レスポンスボディに `"data"` 配列と `"meta"` オブジェクト（current_page, last_page, per_page, total）が含まれること
 
-この経験を糧に、ぜひ次のステップへと進んでください。本当にお疲れ様でした！
+### 8-2. 検索パラメータ付き一覧: GET /api/v1/contacts?keyword=...
+
+1. HTTPメソッドを **GET** のまま、URLに `http://localhost/api/v1/contacts` を入力します。
+2. 「Params」タブをクリックし、以下のクエリパラメータを追加します。
+
+| KEY | VALUE |
+|---|---|
+| per_page | 5 |
+
+3. 「Send」をクリックします。
+
+**確認ポイント:**
+- ステータスコードが **200 OK** であること
+- `"meta"` の `per_page` が `5` であること
+- `"data"` 配列に最大5件のデータが含まれること
+
+続けて、`keyword` パラメータも試してみましょう。一覧レスポンスの `"data"` 配列から任意のContactの `first_name` の値をコピーし、以下のように設定します。
+
+| KEY | VALUE |
+|---|---|
+| keyword | （コピーした姓） |
+
+**確認ポイント:**
+- `"data"` 配列に、指定したキーワードに一致するContactのみが含まれること
+- キーワードは姓（first_name）、名（last_name）、メールアドレス（email）の部分一致で検索されること
+
+### 8-3. 詳細取得: GET /api/v1/contacts/1
+
+1. HTTPメソッドを **GET** に設定します。
+2. URLに `http://localhost/api/v1/contacts/1` を入力します。
+3. 「Send」をクリックします。
+
+**確認ポイント:**
+- ステータスコードが **200 OK** であること
+- `"data"` オブジェクト内に `"category"` と `"tags"` がネストされて含まれること
+
+### 8-4. 新規作成: POST /api/v1/contacts
+
+1. HTTPメソッドを **POST** に変更します。
+2. URLに `http://localhost/api/v1/contacts` を入力します。
+3. 「Headers」タブをクリックし、以下のヘッダーを追加します。
+
+| KEY | VALUE |
+|---|---|
+| Accept | application/json |
+
+4. 「Body」タブをクリックし、「raw」を選択、ドロップダウンで「JSON」を選びます。
+5. 以下のJSONを入力します。
+
+```json
+{
+    "first_name": "テスト",
+    "last_name": "太郎",
+    "gender": 1,
+    "email": "test-api@example.com",
+    "tel": "09012345678",
+    "address": "東京都渋谷区1-1-1",
+    "building": "テストビル101",
+    "category_id": 1,
+    "detail": "APIからの問い合わせです",
+    "tag_ids": [1, 2]
+}
+```
+
+6. 「Send」をクリックします。
+
+**確認ポイント:**
+- ステータスコードが **201 Created** であること
+- レスポンスボディに作成されたリソースのJSONが返ること
+- `"tags"` 配列に指定したタグが含まれていること
+- phpMyAdminで `contacts` テーブルにレコードが追加され、`contact_tag` テーブルにも紐付けレコードが作成されていること
+
+### 8-5. 更新: PUT /api/v1/contacts/{id}
+
+1. HTTPメソッドを **PUT** に変更します。
+2. URLに `http://localhost/api/v1/contacts/1` を入力します（`1` は更新したいContactのIDに置き換えてください）。
+3. 「Headers」タブで `Accept: application/json` ヘッダーが設定されていることを確認します。
+4. 「Body」タブで「raw」→「JSON」を選択し、以下のJSONを入力します。
+
+```json
+{
+    "first_name": "更新",
+    "last_name": "太郎",
+    "gender": 2,
+    "email": "updated@example.com",
+    "tel": "08011112222",
+    "address": "大阪府大阪市1-2-3",
+    "category_id": 1,
+    "detail": "更新されたお問い合わせです",
+    "tag_ids": [3, 4]
+}
+```
+
+5. 「Send」をクリックします。
+
+**確認ポイント:**
+- ステータスコードが **200 OK** であること
+- レスポンスボディに更新後のデータが反映されていること
+- `"tags"` 配列が更新後のタグ（`tag_ids` で指定したもの）に置き換わっていること（`sync()` による同期）
+
+### 8-6. 削除: DELETE /api/v1/contacts/{id}
+
+1. HTTPメソッドを **DELETE** に変更します。
+2. URLに `http://localhost/api/v1/contacts/1` を入力します（`1` は削除したいContactのIDに置き換えてください）。
+3. 「Send」をクリックします。
+
+**確認ポイント:**
+- ステータスコードが **204 No Content** であること
+- レスポンスボディが空であること
+- phpMyAdminで該当レコードが削除されていること
+
+### 8-7. 存在しないIDへのアクセス（404確認）
+
+1. HTTPメソッドを **GET** に設定します。
+2. URLに `http://localhost/api/v1/contacts/9999` を入力します。
+3. 「Headers」タブで `Accept: application/json` ヘッダーが設定されていることを確認します。
+4. 「Send」をクリックします。
+
+**確認ポイント:**
+- ステータスコードが **404 Not Found** であること
+- レスポンスボディが以下のJSONであること
+
+```json
+{
+    "error": "お問い合わせが見つかりませんでした。"
+}
+```
+
+### 8-8. バリデーションエラーの確認（422確認）
+
+1. HTTPメソッドを **POST** に変更します。
+2. URLに `http://localhost/api/v1/contacts` を入力します。
+3. 「Headers」タブで `Accept: application/json` ヘッダーが設定されていることを確認します。
+4. 「Body」タブで「raw」→「JSON」を選択し、空のJSONオブジェクト `{}` を入力します。
+5. 「Send」をクリックします。
+
+**確認ポイント:**
+- ステータスコードが **422 Unprocessable Entity** であること
+- レスポンスボディに `"message"` と `"errors"` オブジェクトが含まれ、各必須フィールドのエラーメッセージが表示されること
+
+> **💡 `Accept: application/json` ヘッダーの重要性**
+>
+> POST/PUTリクエストでバリデーションエラーが発生した場合、Laravelは `Accept` ヘッダーを確認して応答形式を決定します。`Accept: application/json` がない場合、Laravelはリダイレクト（302）を返してしまいます。Postmanでは「Headers」タブで `Accept: application/json` を明示的に設定しましょう。
+>
+> なお、GETリクエストやPostmanの「Send」ボタンではデフォルトで `Accept: */*` が送信されますが、GETリクエストの場合はLaravelがJSONを正しく返すため、特に問題ありません。POST/PUT/DELETEの場合は必ず設定してください。
+
+---
+
+## 9. まとめ ✨
+
+お疲れ様でした！このチャプターでは、既存のSSR（Blade）アプリケーションに公開APIを追加し、以下のスキルを習得しました。
+
+- **API Resources** でEloquentモデルをJSON形式に変換する方法
+- **API用コントローラー** の設計とWeb版との分離（名前空間の活用）
+- **routes/api.php** でのルート定義と `/api` プレフィックスの仕組み
+- **HTTPステータスコード** の使い分け（200, 201, 204, 404, 422）
+- **エラーハンドリング** （404でのカスタムJSON応答）
+
+> **💡 コラム: 検索ロジックの共通化**
+>
+> 今回、Web版の `AdminController@index` とAPI版の `Api\V1\ContactController@index` で検索ロジック（keyword, gender, category_id, date のフィルタリング）が重複していることに気づいたかもしれません。
+>
+> 実務では、このような重複を解消するために以下の手法が使われます：
+>
+> 1. **Eloquent Local Scope**: Contactモデルに `scopeSearch($query, $filters)` メソッドを定義し、両コントローラーから `Contact::search($filters)` のように呼び出す
+> 2. **Service層**: `ContactSearchService` クラスを作成し、検索ロジックをカプセル化する
+> 3. **Query Builder クラス**: `ContactQueryBuilder` のような専用クラスで検索条件を組み立てる
+>
+> これらはリファクタリングのテーマとして、ぜひ挑戦してみてください。テストが書かれていれば、リファクタリング後もテストを実行して既存の動作が壊れていないことを確認できます。
+
+次の最終チャプターでは、これまでに実装してきた全ての機能（Web + API）に対する**自動テスト**を実装していきます。一度書けば何度でも同じ検証を瞬時に実行してくれるテストは、品質保証の強力な武器です。
