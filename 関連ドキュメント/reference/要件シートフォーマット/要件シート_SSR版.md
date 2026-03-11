@@ -470,6 +470,63 @@ Bladeは提供済みのため、バックエンドの実装に集中してくだ
 | | | updated_at | timestamp | | | | $table->timestamps() |
 | | | （複合制約） | | | | | UNIQUE(contact_id, tag_id) |
 
+### ER図
+
+```mermaid
+erDiagram
+    users {
+        bigint_unsigned id PK
+        varchar_255 name
+        varchar_255 email UK
+        timestamp email_verified_at
+        varchar_255 password
+        varchar_100 remember_token
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    categories {
+        bigint_unsigned id PK
+        varchar_255 content
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    contacts {
+        bigint_unsigned id PK
+        bigint_unsigned category_id FK
+        varchar_255 first_name
+        varchar_255 last_name
+        tinyint gender "1:男性 2:女性 3:その他"
+        varchar_255 email
+        varchar_11 tel "10-11桁 ハイフンなし"
+        varchar_255 address
+        varchar_255 building "nullable"
+        varchar_120 detail
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    tags {
+        bigint_unsigned id PK
+        varchar_50 name UK
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    contact_tag {
+        bigint_unsigned id PK
+        bigint_unsigned contact_id FK
+        bigint_unsigned tag_id FK
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    categories ||--o{ contacts : "has many"
+    contacts ||--o{ contact_tag : "has many"
+    tags ||--o{ contact_tag : "has many"
+```
+
 ---
 
 ## 13. 機能要件v2（ユーザーストーリー形式）
