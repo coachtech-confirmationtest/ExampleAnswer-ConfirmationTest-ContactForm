@@ -52,20 +52,6 @@
 | Laravel単体 | ログイン機能において、誤った資格情報でログインした際にエラーメッセージが表示されるか。 | 1 | FALSE | 0 |
 | Laravel単体 | ログアウト機能において、ログアウト操作でセッションが破棄されるか。 | 1 | FALSE | 0 |
 | Laravel単体 | ログアウト機能において、ログアウト後に /admin へアクセスできないか。 | 1 | FALSE | 0 |
-| Laravel単体 | 公開API機能において、GET /api/v1/contacts にアクセスした際にJSON形式でお問い合わせ一覧が返るか。 | 1 | FALSE | 0 |
-| Laravel単体 | 公開API機能において、一覧レスポンスにdata配列とmeta情報（current_page, last_page, per_page, total）が含まれるか。 | 1 | FALSE | 0 |
-| Laravel単体 | 公開API機能において、keyword検索パラメータが正しく動作するか。 | 1 | FALSE | 0 |
-| Laravel単体 | 公開API機能において、gender/category_id/dateフィルタが正しく動作するか。 | 1 | FALSE | 0 |
-| Laravel単体 | 公開API機能において、ページネーションがデフォルト20件ごとに動作し、per_pageパラメータで変更可能か。 | 1 | FALSE | 0 |
-| Laravel単体 | 公開API機能において、GET /api/v1/contacts/{id} にアクセスした際にJSON形式で詳細が返るか。 | 1 | FALSE | 0 |
-| Laravel単体 | 公開API機能において、詳細レスポンスにcategoryとtagsがネストされているか。 | 1 | FALSE | 0 |
-| Laravel単体 | 公開API機能において、存在しないIDで404エラーJSONが返るか。 | 1 | FALSE | 0 |
-| Laravel単体 | 公開API機能において、POST /api/v1/contacts でお問い合わせが作成され201が返るか。 | 1 | FALSE | 0 |
-| Laravel単体 | 公開API機能において、PUT /api/v1/contacts/{id} でお問い合わせが更新され200が返るか。 | 1 | FALSE | 0 |
-| Laravel単体 | 公開API機能において、DELETE /api/v1/contacts/{id} でお問い合わせが削除され204が返るか。 | 1 | FALSE | 0 |
-| Laravel単体 | 公開API機能において、API用コントローラーがWeb用と分離されているか（Api\V1名前空間）。 | 1 | FALSE | 0 |
-| Laravel単体 | 公開API機能において、API ResourcesによるJSON整形が使用されているか。 | 1 | FALSE | 0 |
-| Laravel単体 | 公開API機能において、API用のFormRequest（Api\V1名前空間）でバリデーションが実装されているか。 | 1 | FALSE | 0 |
 | マイグレーション | usersテーブルにおいて、id がBIGINT AUTO_INCREMENT + PRIMARY KEY になっているか。 | 1 | FALSE | 0 |
 | マイグレーション | usersテーブルにおいて、name / email / password が VARCHAR(255) で、email に UNIQUE 制約があるか。 | 1 | FALSE | 0 |
 | マイグレーション | usersテーブルにおいて、email_verified_at が NULL許容の timestamp になっているか。 | 1 | FALSE | 0 |
@@ -103,6 +89,26 @@
 | バリデーション | ログイン画面にて、以下のルールでバリデーションができていること email: 必須 / email / max:255、password: 必須 | 1 | FALSE | 0 |
 | バリデーション | お問い合わせ一覧APIにて、以下のルールでフォームリクエストを用いたバリデーションができていること keyword: nullable / string / max:255、gender: nullable / integer / in:1,2,3、category_id: nullable / integer / exists:categories,id、date: nullable / date、per_page: nullable / integer / min:1 / max:100 | 1 | FALSE | 0 |
 | バリデーション | お問い合わせ作成・更新APIにて、Web版と同一ルール（first_name〜detail + tag_ids[]）でフォームリクエストを用いたバリデーションができていること | 1 | FALSE | 0 |
+| API | GET /api/v1/contacts にて、正常系でリクエストを送信すると HTTP 200 が返り、JSON の data 配列と meta 情報（current_page, last_page, per_page, total）が含まれるか確認。 | 1 | FALSE | 0 |
+| API | GET /api/v1/contacts にて、keyword 検索パラメータで正しくフィルタリングされるか確認。 | 1 | FALSE | 0 |
+| API | GET /api/v1/contacts にて、gender フィルタで正しくフィルタリングされるか確認。 | 1 | FALSE | 0 |
+| API | GET /api/v1/contacts にて、category_id フィルタで正しくフィルタリングされるか確認。 | 1 | FALSE | 0 |
+| API | GET /api/v1/contacts にて、date フィルタで正しくフィルタリングされるか確認。 | 1 | FALSE | 0 |
+| API | GET /api/v1/contacts にて、gender=9 のような不正値で 422 が返り、バリデーションエラーが返るか確認。 | 1 | FALSE | 0 |
+| API | GET /api/v1/contacts にて、十分な件数を用意し per_page や page パラメータでページング結果が正しいか確認。 | 1 | FALSE | 0 |
+| API | GET /api/v1/contacts/{id} にて、存在する ID を指定して 200 が返り、data 内にカテゴリ・タグ付きの ContactResource が返るか確認。 | 1 | FALSE | 0 |
+| API | GET /api/v1/contacts/{id} にて、存在しない ID を指定すると 404 とエラーメッセージ JSON が返るか確認。 | 1 | FALSE | 0 |
+| API | POST /api/v1/contacts にて、正常 payload でリクエストし 201 が返り、contacts と contact_tag にレコードが追加されるか確認。 | 1 | FALSE | 0 |
+| API | POST /api/v1/contacts にて、tag_ids を省略または空配列で送信しても 201 が返り、contact_tag にレコードが入らないことを確認。 | 1 | FALSE | 0 |
+| API | POST /api/v1/contacts にて、不正データ（tel 9桁等）で送信すると 422 とバリデーションエラーが返るか確認。 | 1 | FALSE | 0 |
+| API | PUT /api/v1/contacts/{id} にて、正常 payload で 200 が返り、更新内容がレスポンスに反映されるか確認。 | 1 | FALSE | 0 |
+| API | PUT /api/v1/contacts/{id} にて、存在しない ID を指定すると 404 が返るか確認。 | 1 | FALSE | 0 |
+| API | PUT /api/v1/contacts/{id} にて、不正データで送信すると 422 とバリデーションエラーが返るか確認。 | 1 | FALSE | 0 |
+| API | DELETE /api/v1/contacts/{id} にて、既存 ID でリクエストして 204 が返り、contacts の該当レコードが削除されるか確認。 | 1 | FALSE | 0 |
+| API | DELETE /api/v1/contacts/{id} にて、存在しない ID を指定して 404 が返るか確認。 | 1 | FALSE | 0 |
+| API | API用コントローラーがWeb用と分離されているか（Api\V1名前空間）。 | 1 | FALSE | 0 |
+| API | API Resources（ContactResource）によるJSON整形が使用されているか。 | 1 | FALSE | 0 |
+| API | API用のFormRequest（Api\V1名前空間）でバリデーションが実装されているか。 | 1 | FALSE | 0 |
 | シーディング | 要件の指示に従って、Userテーブルのダミーデータとして要件で指示されたユーザーを作成することができているか | 1 | FALSE | 0 |
 | シーディング | 要件の指示に従って、categoryテーブルのダミーデータ 5件を作成できているか | 1 | FALSE | 0 |
 | シーディング | 要件の指示に従って、Tagテーブルのダミーデータを5件作成できているか | 1 | FALSE | 0 |
@@ -163,26 +169,23 @@
 
 | 大項目 | 項目数 | 配点合計 |
 |--------|--------|---------|
-| Laravel単体 | 62 | 62 |
+| Laravel単体 | 48 | 48 |
 | マイグレーション | 32 | 32 |
 | バリデーション | 10 | 10 |
+| API | 20 | 20 |
 | シーディング | 5 | 5 |
 | テスト | 24 | 24 |
 | コード品質 | 17 | 17 |
 | ドキュメント | 2 | 4 |
-| **合計** | **152** | **154** |
+| **合計** | **158** | **160** |
 
 ## 旧版（API版）からの変更サマリ
 
 | 変更種別 | 内容 |
 |---------|------|
-| 削除 | API大項目 21項目（GET/POST/PUT/DELETE /api/* 関連すべて） |
+| 変更 | API大項目: 旧版の /api/* 21項目を削除し、SSR版の /api/v1/contacts 向け20項目として再構成 |
 | 削除 | テスト: API Resource テスト 3項目（CategoryResource, ContactResource, TagResource） |
-| 削除 | テスト: API Feature テスト 7項目（/api/categories, /api/contacts, /api/tags 関連） |
-| 削除 | Laravel単体: GET /api/categories, GET /api/tags の API呼び出し確認 2項目 |
-| 削除 | Laravel単体: POST /api/contacts レスポンス 201 確認 1項目 |
-| 削除 | Laravel単体: GET /api/contacts 検索・ページネーション API呼び出し確認 2項目 |
-| 削除 | Laravel単体: DELETE /api/contacts/{id} レスポンス 204 確認 1項目 |
+| 変更 | テスト: API Feature テスト → /api/v1/contacts の CRUD + バリデーション 5項目に再構成 |
 | 変更 | Laravel単体: 確認画面 → JS切り替えから POST /contacts/confirm ページ遷移へ |
 | 変更 | Laravel単体: 送信 → POST /api/contacts (201) から POST /contacts (redirect) へ |
 | 変更 | Laravel単体: 詳細 → モーダル表示から GET /admin/contacts/{id} ページ遷移へ |
