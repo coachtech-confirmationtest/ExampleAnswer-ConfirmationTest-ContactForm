@@ -199,6 +199,7 @@ public function boot(): void
 
 ```bash
 mkdir -p lang/ja
+touch lang/ja/auth.php lang/ja/validation.php
 ```
 
 ログイン画面では、2種類のエラーメッセージを日本語化する必要があります。それぞれ対応する言語ファイルを作成します。
