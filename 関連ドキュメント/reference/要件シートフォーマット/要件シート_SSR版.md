@@ -39,7 +39,7 @@
 | | 使用技術 | Laravel 10, MySQL 8.0, Nginx, Dockerなど、使用した技術スタック一覧 | |
 | | 作成者 | 自分の名前 | |
 | コード品質担保のための指示 | 命名規則 | ・Laravelの標準命名規則（PSR-12準拠）に従うこと<br> - 変数/メソッド: `camelCase`<br> - クラス: `PascalCase`<br> - DBテーブル: `snake_case`（複数形）<br> - DBカラム: `snake_case`（単数形）<br> - モデル名：アッパーキャメル<br> - コントローラー名：アッパーキャメル<br> - フォームリクエスト名：アッパーキャメル<br> - マイグレーションファイル名：スネークケース<br> - シーディングファイル名：アッパーキャメル | |
-| | コードフォーマット | ・Laravel Pintを使用してコードを自動整形すること<br>・コミット前に `vendor/bin/pint` を実行し、整形されたコードをコミットする | |
+| | コードフォーマット | ・Laravel Pintを使用してコードを自動整形すること<br>・コミット前に `vendor/bin/pint` または `sail bin pint` を実行し、整形されたコードをコミットする<br>・採点基準: `sail bin pint --test` を実行し「No fixable issues were found」と表示されること | |
 | | Eloquent ORM | ・DB操作にはEloquentを最大限活用し、クエリビルダや生SQLは原則使用しない<br>・N+1問題を避けるため、`with()`メソッドによるEager Loadingを適切に使用する | |
 | | コントローラーの責務 | ・コントローラーはリクエストの受付とレスポンスの返却に専念させる<br>・複雑なビジネスロジックはモデルやサービスクラス（任意）に記述する | |
 | | FormRequest | ・バリデーションロジックは必ずFormRequestクラスに分離する | |
