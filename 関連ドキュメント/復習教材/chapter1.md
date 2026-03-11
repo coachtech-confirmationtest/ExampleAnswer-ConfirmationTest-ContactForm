@@ -391,7 +391,8 @@ Laravel Sailの環境構築で、以下のコマンドを実行しました。
 環境構築が正しく完了しているか、以下の項目を確認してください。
 
 1. `sail up -d`を実行し、コンテナが正常に起動すること（`sail ps`で各コンテナが`running`状態）
-2. `http://localhost`にアクセスし、Laravelの初期画面が表示されること
+2. `http://localhost`にアクセスし、Laravelのエラーページが表示されること
+   - Bladeファイルを入れ替え済みのため、デフォルトの `welcome.blade.php` が存在せず「View [welcome] not found.」というエラーが表示されます。**これは正常です。** ルーティングは次のチャプター以降で設定するため、この時点ではエラーになることが想定されています。エラーページが表示されていれば、Laravel自体は正しく動作しています。
 3. `http://localhost:8080`にアクセスし、phpMyAdminが表示されること
 4. `sail npm run dev`を実行し、Viteの開発サーバーが起動すること
 
