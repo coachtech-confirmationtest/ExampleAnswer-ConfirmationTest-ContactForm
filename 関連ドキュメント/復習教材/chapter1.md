@@ -106,7 +106,7 @@ docker run --rm \
 DB_CONNECTION=mysql
 DB_HOST=mysql
 DB_PORT=3306
-DB_DATABASE=contactform
+DB_DATABASE=laravel
 DB_USERNAME=sail
 DB_PASSWORD=password
 ```
