@@ -751,10 +751,50 @@ class IndexContactRequestTest extends TestCase
         $this->assertArrayHasKey('gender', $validator->errors()->messages());
     }
 
+    public function test_rules_reject_gender_value_9(): void
+    {
+        $validator = $this->validator([
+            'gender' => 9,
+        ]);
+
+        $this->assertTrue($validator->fails());
+        $this->assertArrayHasKey('gender', $validator->errors()->messages());
+    }
+
+    public function test_rules_reject_nonexistent_category(): void
+    {
+        $validator = $this->validator([
+            'category_id' => 9999,
+        ]);
+
+        $this->assertTrue($validator->fails());
+        $this->assertArrayHasKey('category_id', $validator->errors()->messages());
+    }
+
+    public function test_rules_reject_invalid_date(): void
+    {
+        $validator = $this->validator([
+            'date' => 'not-a-date',
+        ]);
+
+        $this->assertTrue($validator->fails());
+        $this->assertArrayHasKey('date', $validator->errors()->messages());
+    }
+
     public function test_rules_reject_per_page_exceeding_100(): void
     {
         $validator = $this->validator([
             'per_page' => 101,
+        ]);
+
+        $this->assertTrue($validator->fails());
+        $this->assertArrayHasKey('per_page', $validator->errors()->messages());
+    }
+
+    public function test_rules_reject_per_page_zero(): void
+    {
+        $validator = $this->validator([
+            'per_page' => 0,
         ]);
 
         $this->assertTrue($validator->fails());
@@ -768,7 +808,11 @@ class IndexContactRequestTest extends TestCase
 - `test_rules_accept_valid_filters()`: keyword、gender、category_id、date、per_pageの全フィルタが有効な値であればバリデーションを通過すること（`passes()`）をテストします。
 - `test_rules_accept_empty_filters()`: フィルタが全て未指定（空配列）の場合でもバリデーションを通過することをテストします。全てのフィールドが`nullable`であるため、何も指定しなくても有効です。
 - `test_rules_reject_invalid_gender()`: Web版では `in:0,1,2,3` で `0`（=全て）が有効ですが、API版では `in:1,2,3` なので `0` は拒否されることを確認します。これがWeb版との重要な差異です。
+- `test_rules_reject_gender_value_9()`: 範囲外の性別値（`9`）がバリデーションに失敗することをテストします。`in:1,2,3` に含まれない値の検証です。
+- `test_rules_reject_nonexistent_category()`: 存在しない`category_id`（`9999`）が指定された場合にバリデーションが失敗すること（`exists:categories,id`）をテストします。
+- `test_rules_reject_invalid_date()`: 日付として不正な文字列（`'not-a-date'`）が指定された場合にバリデーションが失敗すること（`date`ルール）をテストします。
 - `test_rules_reject_per_page_exceeding_100()`: `per_page`に101以上の値が指定された場合にバリデーションが失敗すること（`max:100`）をテストします。API固有のバリデーションルールの検証です。
+- `test_rules_reject_per_page_zero()`: `per_page`に`0`が指定された場合にバリデーションが失敗すること（`min:1`）をテストします。
 
 #### 5.3.2 API作成バリデーションのテスト
 
@@ -860,12 +904,28 @@ class StoreContactRequestTest extends TestCase
         $this->assertArrayHasKey('tel', $validator->errors()->messages());
     }
 
+    public function test_rules_reject_invalid_email(): void
+    {
+        $validator = $this->validator($this->validData(['email' => 'invalid-email']));
+
+        $this->assertTrue($validator->fails());
+        $this->assertArrayHasKey('email', $validator->errors()->messages());
+    }
+
     public function test_rules_reject_detail_exceeding_120_chars(): void
     {
         $validator = $this->validator($this->validData(['detail' => str_repeat('あ', 121)]));
 
         $this->assertTrue($validator->fails());
         $this->assertArrayHasKey('detail', $validator->errors()->messages());
+    }
+
+    public function test_rules_reject_invalid_gender(): void
+    {
+        $validator = $this->validator($this->validData(['gender' => 0]));
+
+        $this->assertTrue($validator->fails());
+        $this->assertArrayHasKey('gender', $validator->errors()->messages());
     }
 }
 ```
@@ -876,8 +936,10 @@ class StoreContactRequestTest extends TestCase
 - `test_rules_accept_valid_data()`: 全ての必須項目が正しく入力されたデータがバリデーションを通過すること（`passes()`）をテストします。
 - `test_rules_accept_valid_data_with_tags()`: `tag_ids`にFactoryで作成した有効なタグIDの配列を指定した場合も、バリデーションを通過することをテストします。`tag_ids`は`nullable`かつ`exists:tags,id`なので、存在するタグIDであれば有効です。
 - `test_rules_reject_missing_required_fields()`: 空のデータを渡した場合に、8つの必須フィールド（first_name, last_name, gender, email, tel, address, category_id, detail）全てにエラーが発生することをテストします。`assertArrayHasKey()`で各フィールドのエラーの存在を確認します。
+- `test_rules_reject_invalid_email()`: メールアドレスに不正な値（`'invalid-email'`）を指定した場合に、バリデーションが失敗すること（`email`ルール）をテストします。
 - `test_rules_reject_invalid_tel()`: 電話番号に不正な値（`'123'`：3桁のみ）を指定した場合に、バリデーションが失敗すること（`regex:/^[0-9]{10,11}$/`に不一致）をテストします。
 - `test_rules_reject_detail_exceeding_120_chars()`: お問い合わせ内容に121文字の文字列（`str_repeat('あ', 121)`）を指定した場合に、バリデーションが失敗すること（`max:120`を超過）をテストします。
+- `test_rules_reject_invalid_gender()`: 性別に不正な値（`0`）を指定した場合に、バリデーションが失敗すること（API版では`in:1,2,3`）をテストします。Web版では`0`が有効ですが、API版では無効です。
 
 ## 6. 機能テスト (Feature Tests) の作成 — Web機能 🚀
 
@@ -1496,6 +1558,29 @@ class ContactApiTest extends TestCase
         $response->assertJsonPath('data.0.gender', 1);
     }
 
+    public function test_index_filters_by_category_id(): void
+    {
+        $category = Category::factory()->create();
+        Contact::factory()->for($category)->create();
+        Contact::factory()->create();
+
+        $response = $this->getJson('/api/v1/contacts?category_id=' . $category->id);
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+    }
+
+    public function test_index_filters_by_date(): void
+    {
+        Contact::factory()->create(['created_at' => Carbon::parse('2024-02-01 09:00:00')]);
+        Contact::factory()->create(['created_at' => Carbon::parse('2024-02-02 09:00:00')]);
+
+        $response = $this->getJson('/api/v1/contacts?date=2024-02-01');
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+    }
+
     public function test_index_returns_validation_error_for_invalid_gender(): void
     {
         $response = $this->getJson('/api/v1/contacts?gender=9');
@@ -1520,6 +1605,7 @@ class ContactApiTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('data.first_name', 'Mika');
+        $response->assertJsonPath('data.last_name', 'Suzuki');
         $response->assertJsonPath('data.category.content', 'Support');
         $response->assertJsonPath('data.tags.0.name', '質問');
     }
@@ -1557,9 +1643,17 @@ class ContactApiTest extends TestCase
         $response->assertCreated();
         $response->assertJsonPath('data.first_name', '山田');
         $response->assertJsonPath('data.email', 'yamada@example.com');
+        $response->assertJsonPath('data.category.id', $category->id);
         $response->assertJsonCount(2, 'data.tags');
 
         $this->assertDatabaseHas('contacts', ['email' => 'yamada@example.com']);
+        $contact = Contact::where('email', 'yamada@example.com')->first();
+        foreach ($tags as $tag) {
+            $this->assertDatabaseHas('contact_tag', [
+                'contact_id' => $contact->id,
+                'tag_id' => $tag->id,
+            ]);
+        }
     }
 
     public function test_store_returns_validation_error_for_missing_fields(): void
@@ -1573,13 +1667,37 @@ class ContactApiTest extends TestCase
         ]);
     }
 
+    public function test_store_returns_validation_error_for_invalid_email(): void
+    {
+        $category = Category::factory()->create();
+
+        $payload = [
+            'first_name' => '山田',
+            'last_name' => '太郎',
+            'gender' => 1,
+            'email' => 'invalid-email',
+            'tel' => '09012345678',
+            'address' => '東京都渋谷区1-1-1',
+            'category_id' => $category->id,
+            'detail' => 'お問い合わせ内容',
+        ];
+
+        $response = $this->postJson('/api/v1/contacts', $payload);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors('email');
+    }
+
     // ==================== UPDATE ====================
 
     public function test_update_modifies_contact_and_returns_json(): void
     {
         $category = Category::factory()->create();
         $newCategory = Category::factory()->create(['content' => '新カテゴリ']);
-        $contact = Contact::factory()->for($category)->create();
+        $contact = Contact::factory()->for($category)->create([
+            'first_name' => '田中',
+            'last_name' => '花子',
+        ]);
         $newTag = Tag::factory()->create(['name' => '更新済み']);
 
         $payload = [
@@ -1589,6 +1707,7 @@ class ContactApiTest extends TestCase
             'email' => 'sato@example.com',
             'tel' => '08011112222',
             'address' => '大阪府大阪市1-2-3',
+            'building' => null,
             'category_id' => $newCategory->id,
             'detail' => '更新内容です',
             'tag_ids' => [$newTag->id],
@@ -1598,8 +1717,15 @@ class ContactApiTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('data.first_name', '佐藤');
+        $response->assertJsonPath('data.last_name', '次郎');
         $response->assertJsonPath('data.category.content', '新カテゴリ');
+        $response->assertJsonCount(1, 'data.tags');
         $response->assertJsonPath('data.tags.0.name', '更新済み');
+
+        $this->assertDatabaseHas('contacts', [
+            'id' => $contact->id,
+            'first_name' => '佐藤',
+        ]);
     }
 
     public function test_update_returns_404_for_nonexistent_contact(): void
@@ -1614,6 +1740,16 @@ class ContactApiTest extends TestCase
         ]);
 
         $response->assertNotFound();
+    }
+
+    public function test_update_returns_validation_error_for_invalid_data(): void
+    {
+        $contact = Contact::factory()->create();
+
+        $response = $this->putJson('/api/v1/contacts/' . $contact->id, []);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['first_name', 'last_name']);
     }
 
     // ==================== DESTROY ====================
@@ -1667,6 +1803,8 @@ class ContactApiTest extends TestCase
 - `test_index_accepts_custom_per_page()`: `?per_page=5` を指定した場合に、5件ごとのページネーションに変更されることをテストします。
 - `test_index_filters_by_keyword()`: `first_name` が異なる2件のContactを作成し、`?keyword=Ken` でフィルタリングした場合に該当する1件だけが返ることをテストします。`assertJsonPath('data.0.first_name', 'Ken')` で返されたデータの中身も検証します。
 - `test_index_filters_by_gender()`: gender が異なる2件のContactを作成し、`?gender=1` で男性のみにフィルタリングされることをテストします。
+- `test_index_filters_by_category_id()`: 特定のカテゴリに属するContactと別カテゴリのContactを作成し、`?category_id=` でフィルタリングした場合に該当する1件だけが返ることをテストします。
+- `test_index_filters_by_date()`: 異なる日付の2件のContactを作成し、`?date=2024-02-01` で該当日のみにフィルタリングされることをテストします。
 - `test_index_returns_validation_error_for_invalid_gender()`: `?gender=9` のような不正な値を指定した場合に、422ステータスとバリデーションエラーが返ることをテストします。`assertJsonValidationErrors('gender')` でgenderフィールドにエラーがあることを確認します。
 
 **詳細取得（SHOW）テスト:**
@@ -1676,13 +1814,15 @@ class ContactApiTest extends TestCase
 
 **作成（STORE）テスト:**
 
-- `test_store_creates_contact_and_returns_201()`: 有効なペイロード（タグ含む）を `POST /api/v1/contacts` に送信し、201 Createdが返ること、レスポンスJSONに正しいデータが含まれること、そしてデータベースにレコードが実際に保存されていること（`assertDatabaseHas`）をテストします。
+- `test_store_creates_contact_and_returns_201()`: 有効なペイロード（タグ含む）を `POST /api/v1/contacts` に送信し、201 Createdが返ること、レスポンスJSONに正しいデータ（カテゴリIDやタグ数）が含まれること、データベースにレコードが保存されていること、そして中間テーブル（`contact_tag`）にタグの紐付けが正しく保存されていることをテストします。
 - `test_store_returns_validation_error_for_missing_fields()`: 空のペイロードを送信した場合に、422ステータスが返り、8つの必須フィールド（first_name, last_name, gender, email, tel, address, category_id, detail）全てにバリデーションエラーが発生することをテストします。
+- `test_store_returns_validation_error_for_invalid_email()`: メールアドレスに不正な値（`'invalid-email'`）を指定した場合に、422ステータスとemailフィールドのバリデーションエラーが返ることをテストします。
 
 **更新（UPDATE）テスト:**
 
-- `test_update_modifies_contact_and_returns_json()`: 既存のContactに対して新しいデータ（別のカテゴリ・タグ含む）を `PUT /api/v1/contacts/{id}` で送信し、200 OKが返ること、レスポンスJSONに更新後のデータ（新しいfirst_name、新しいカテゴリ名、新しいタグ名）が反映されていることをテストします。
+- `test_update_modifies_contact_and_returns_json()`: 既存のContactに対して新しいデータ（別のカテゴリ・タグ含む）を `PUT /api/v1/contacts/{id}` で送信し、200 OKが返ること、レスポンスJSONに更新後のデータ（新しいfirst_name、last_name、新しいカテゴリ名、タグ数、新しいタグ名）が反映されていること、そしてデータベースの値も正しく更新されていることをテストします。
 - `test_update_returns_404_for_nonexistent_contact()`: 存在しないID（9999）に対して有効なペイロードを送信した場合に、404ステータスが返ることをテストします。ルートモデルバインディングによる自動的な404処理の検証です。
+- `test_update_returns_validation_error_for_invalid_data()`: 空のペイロードで更新を試みた場合に、422ステータスとバリデーションエラーが返ることをテストします。
 
 **削除（DESTROY）テスト:**
 
@@ -1721,14 +1861,20 @@ sail artisan test
    ✓ rules accept valid filters
    ✓ rules accept empty filters
    ✓ rules reject invalid gender
+   ✓ rules reject gender value 9
+   ✓ rules reject nonexistent category
+   ✓ rules reject invalid date
    ✓ rules reject per page exceeding 100
+   ✓ rules reject per page zero
 
    PASS  Tests\Unit\Requests\Api\V1\StoreContactRequestTest
    ✓ rules accept valid data
    ✓ rules accept valid data with tags
    ✓ rules reject missing required fields
+   ✓ rules reject invalid email
    ✓ rules reject invalid tel
    ✓ rules reject detail exceeding 120 chars
+   ✓ rules reject invalid gender
 
    PASS  Tests\Unit\Requests\IndexContactRequestTest
    ✓ rules accept valid filters
@@ -1761,13 +1907,17 @@ sail artisan test
    ✓ index accepts custom per page
    ✓ index filters by keyword
    ✓ index filters by gender
+   ✓ index filters by category id
+   ✓ index filters by date
    ✓ index returns validation error for invalid gender
    ✓ show returns contact detail
    ✓ show returns 404 for nonexistent contact
    ✓ store creates contact and returns 201
    ✓ store returns validation error for missing fields
+   ✓ store returns validation error for invalid email
    ✓ update modifies contact and returns json
    ✓ update returns 404 for nonexistent contact
+   ✓ update returns validation error for invalid data
    ✓ destroy deletes contact and returns 204
    ✓ destroy returns 404 for nonexistent contact
 
@@ -1792,7 +1942,7 @@ sail artisan test
    ✓ authenticated user can delete tag
    ✓ unauthenticated user cannot create tag
 
-  Tests:  58 passed
+  Tests:  68 passed
   Time:   2.50s
 ```
 

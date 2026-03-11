@@ -4,8 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-
 class Contact extends Model
 {
     use HasFactory;
@@ -31,7 +29,7 @@ class Contact extends Model
      * ContactモデルとCategoryモデルの関連を定義します。
      * 1つのコンタクトは1つのカテゴリーに属します。
      */
-    public function category(): BelongsTo
+    public function category()
     {
         return $this->belongsTo(Category::class);
     }
