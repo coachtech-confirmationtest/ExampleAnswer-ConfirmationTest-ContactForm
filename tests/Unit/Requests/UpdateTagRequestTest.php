@@ -19,9 +19,7 @@ class UpdateTagRequestTest extends TestCase
 
         $request = new class($target) extends UpdateTagRequest
         {
-            public function __construct(private Tag $boundTag)
-            {
-            }
+            public function __construct(private Tag $boundTag) {}
 
             public function route($param = null, $default = null)
             {

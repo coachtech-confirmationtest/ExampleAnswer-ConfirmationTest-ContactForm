@@ -20,4 +20,3 @@ class CategoryTest extends TestCase
         $this->assertInstanceOf(Contact::class, $category->contacts->first());
     }
 }
-

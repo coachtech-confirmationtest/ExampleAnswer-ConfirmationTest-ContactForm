@@ -26,7 +26,7 @@ class TagControllerTest extends TestCase
         $user = User::factory()->create();
         $tag = Tag::factory()->create(['name' => 'initial']);
 
-        $response = $this->actingAs($user)->put('/admin/tags/' . $tag->id, ['name' => 'updated']);
+        $response = $this->actingAs($user)->put('/admin/tags/'.$tag->id, ['name' => 'updated']);
 
         $response->assertRedirect('/admin');
         $this->assertDatabaseHas('tags', ['id' => $tag->id, 'name' => 'updated']);
@@ -37,7 +37,7 @@ class TagControllerTest extends TestCase
         $user = User::factory()->create();
         $tag = Tag::factory()->create();
 
-        $response = $this->actingAs($user)->delete('/admin/tags/' . $tag->id);
+        $response = $this->actingAs($user)->delete('/admin/tags/'.$tag->id);
 
         $response->assertRedirect('/admin');
         $this->assertDatabaseMissing('tags', ['id' => $tag->id]);

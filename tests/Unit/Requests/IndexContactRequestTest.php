@@ -14,7 +14,8 @@ class IndexContactRequestTest extends TestCase
 
     private function validator(array $data)
     {
-        $request = new IndexContactRequest();
+        $request = new IndexContactRequest;
+
         return Validator::make($data, $request->rules(), $request->messages());
     }
 
@@ -42,4 +43,3 @@ class IndexContactRequestTest extends TestCase
         $this->assertArrayHasKey('gender', $validator->errors()->messages());
     }
 }
-

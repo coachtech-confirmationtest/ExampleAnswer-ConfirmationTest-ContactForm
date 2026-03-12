@@ -14,7 +14,8 @@ class StoreTagRequestTest extends TestCase
 
     private function validator(array $data)
     {
-        $request = new StoreTagRequest();
+        $request = new StoreTagRequest;
+
         return Validator::make($data, $request->rules());
     }
 
@@ -51,4 +52,3 @@ class StoreTagRequestTest extends TestCase
         $this->assertArrayHasKey('name', $validator->errors()->messages());
     }
 }
-

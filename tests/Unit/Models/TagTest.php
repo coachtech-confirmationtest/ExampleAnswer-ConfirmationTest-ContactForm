@@ -24,4 +24,3 @@ class TagTest extends TestCase
         $this->assertTrue($tag->contacts->pluck('id')->contains($contacts->first()->id));
     }
 }
-

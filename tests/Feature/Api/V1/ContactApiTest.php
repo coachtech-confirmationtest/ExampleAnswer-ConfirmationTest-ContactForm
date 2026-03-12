@@ -97,7 +97,7 @@ class ContactApiTest extends TestCase
         Contact::factory()->for($category)->create();
         Contact::factory()->create();
 
-        $response = $this->getJson('/api/v1/contacts?category_id=' . $category->id);
+        $response = $this->getJson('/api/v1/contacts?category_id='.$category->id);
 
         $response->assertOk();
         $response->assertJsonCount(1, 'data');
@@ -134,7 +134,7 @@ class ContactApiTest extends TestCase
         ]);
         $contact->tags()->attach($tag);
 
-        $response = $this->getJson('/api/v1/contacts/' . $contact->id);
+        $response = $this->getJson('/api/v1/contacts/'.$contact->id);
 
         $response->assertOk();
         $response->assertJsonPath('data.first_name', 'Mika');
@@ -245,7 +245,7 @@ class ContactApiTest extends TestCase
             'tag_ids' => [$newTag->id],
         ];
 
-        $response = $this->putJson('/api/v1/contacts/' . $contact->id, $payload);
+        $response = $this->putJson('/api/v1/contacts/'.$contact->id, $payload);
 
         $response->assertOk();
         $response->assertJsonPath('data.first_name', '佐藤');
@@ -284,7 +284,7 @@ class ContactApiTest extends TestCase
     {
         $contact = Contact::factory()->create();
 
-        $response = $this->putJson('/api/v1/contacts/' . $contact->id, []);
+        $response = $this->putJson('/api/v1/contacts/'.$contact->id, []);
 
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors(['first_name', 'last_name']);
@@ -296,7 +296,7 @@ class ContactApiTest extends TestCase
     {
         $contact = Contact::factory()->create();
 
-        $response = $this->deleteJson('/api/v1/contacts/' . $contact->id);
+        $response = $this->deleteJson('/api/v1/contacts/'.$contact->id);
 
         $response->assertNoContent();
         $this->assertDatabaseMissing('contacts', ['id' => $contact->id]);

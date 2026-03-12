@@ -35,7 +35,7 @@ class ContactExportTest extends TestCase
             'created_at' => Carbon::parse('2024-02-11 10:00:00'),
         ]);
 
-        $response = $this->actingAs($user)->get('/contacts/export?keyword=Smith&gender=1&category_id=' . $categoryA->id . '&date=2024-02-10');
+        $response = $this->actingAs($user)->get('/contacts/export?keyword=Smith&gender=1&category_id='.$categoryA->id.'&date=2024-02-10');
 
         $response->assertOk();
         $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');

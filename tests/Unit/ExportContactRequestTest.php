@@ -14,7 +14,7 @@ class ExportContactRequestTest extends TestCase
 
     private function makeValidator(array $data)
     {
-        $request = new ExportContactRequest();
+        $request = new ExportContactRequest;
 
         return Validator::make($data, $request->rules());
     }

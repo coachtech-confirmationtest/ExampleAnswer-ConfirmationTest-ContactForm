@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Category;
 use App\Models\Contact;
-use App\Models\Tag;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -52,7 +51,7 @@ class AdminControllerTest extends TestCase
             'created_at' => Carbon::parse('2024-02-02 09:00:00'),
         ]);
 
-        $response = $this->actingAs($user)->get('/admin?keyword=Ken&gender=1&category_id=' . $category->id . '&date=2024-02-01');
+        $response = $this->actingAs($user)->get('/admin?keyword=Ken&gender=1&category_id='.$category->id.'&date=2024-02-01');
 
         $response->assertOk();
         $response->assertSee('Ken');
@@ -80,7 +79,7 @@ class AdminControllerTest extends TestCase
             'last_name' => 'Suzuki',
         ]);
 
-        $response = $this->actingAs($user)->get('/admin/contacts/' . $contact->id);
+        $response = $this->actingAs($user)->get('/admin/contacts/'.$contact->id);
 
         $response->assertOk();
         $response->assertViewIs('admin.show');
@@ -94,7 +93,7 @@ class AdminControllerTest extends TestCase
         $user = User::factory()->create();
         $contact = Contact::factory()->create();
 
-        $response = $this->actingAs($user)->delete('/admin/contacts/' . $contact->id);
+        $response = $this->actingAs($user)->delete('/admin/contacts/'.$contact->id);
 
         $response->assertRedirect('/admin');
         $this->assertDatabaseMissing('contacts', ['id' => $contact->id]);
