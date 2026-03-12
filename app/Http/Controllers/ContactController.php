@@ -78,6 +78,7 @@ class ContactController extends Controller
             $handle = fopen('php://output', 'w');
             // BOMを追加（Excel対応）
             fwrite($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, ['ID', '氏名', '性別', 'メールアドレス', '電話番号', '住所', '建物名', 'お問い合わせの種類', '詳細', '作成日時']);
             foreach ($contacts as $contact) {
                 $genderText = match ($contact->gender) {
                     1 => '男性',

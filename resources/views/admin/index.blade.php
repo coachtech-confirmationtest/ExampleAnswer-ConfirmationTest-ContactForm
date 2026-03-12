@@ -130,7 +130,7 @@
                     <label class="block text-sm text-[#6b5744] mb-2" for="tag-name-input">タグ名</label>
                     <input type="text" id="tag-name-input" name="name" placeholder="例: 新機能の要望"
                         class="w-full px-4 py-2 bg-white border border-[#ddd8d3] rounded text-gray-700 placeholder-[#c4bab0] focus:outline-none focus:border-amber-500" />
-                    @error('name')
+                    @error('name', 'storeTag')
                         <div class="mt-2 text-sm text-red-600">{{ $message }}</div>
                     @enderror
                     <div class="flex items-center gap-3 mt-4">
@@ -163,6 +163,9 @@
                                                 更新
                                             </button>
                                         </form>
+                                        @error('name', 'updateTag')
+                                            <div class="mt-1 text-sm text-red-600">{{ $message }}</div>
+                                        @enderror
                                     </td>
                                     <td class="px-6 py-3 text-sm text-right">
                                         <form action="/admin/tags/{{ $tag->id }}" method="post" class="inline">

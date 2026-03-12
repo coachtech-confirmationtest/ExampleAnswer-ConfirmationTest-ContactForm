@@ -4,7 +4,7 @@
             <h1 class="text-2xl font-serif text-[#6b5744] text-center mb-10">Contact</h1>
 
             <!-- 入力フォーム -->
-            <form action="/contacts/confirm" method="post">
+            <form action="/contacts/confirm" method="post" novalidate>
                 @csrf
                 @include('contact._form')
 

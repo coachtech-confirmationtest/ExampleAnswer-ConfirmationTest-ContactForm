@@ -1,6 +1,79 @@
-# お問い合わせフォーム - ContactForm
+# COACHTECH お問い合わせフォーム
 
-このリポジトリは、お問い合わせフォームの機能を実装したLaravelプロジェクトです。
+お問い合わせフォームの機能を実装したLaravelプロジェクトです。
+一般ユーザーがお問い合わせを送信でき、管理者がログイン後にその内容を確認・管理します。
+
+## 作成者
+
+氏名（自身の名前に変更してください）
+
+## 使用技術
+
+- PHP 8.2
+- Laravel 10.x
+- MySQL 8.0
+- Nginx
+- Docker / Docker Compose / Laravel Sail
+- Vite / Tailwind CSS 3.4
+- Laravel Fortify（認証）
+- phpMyAdmin
+
+## ER図
+
+```mermaid
+erDiagram
+    users {
+        bigint_unsigned id PK
+        varchar_255 name
+        varchar_255 email UK
+        timestamp email_verified_at
+        varchar_255 password
+        varchar_100 remember_token
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    categories {
+        bigint_unsigned id PK
+        varchar_255 content
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    contacts {
+        bigint_unsigned id PK
+        bigint_unsigned category_id FK
+        varchar_255 first_name
+        varchar_255 last_name
+        tinyint gender
+        varchar_255 email
+        varchar_11 tel
+        varchar_255 address
+        varchar_255 building
+        varchar_120 detail
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    tags {
+        bigint_unsigned id PK
+        varchar_50 name UK
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    contact_tag {
+        bigint_unsigned id PK
+        bigint_unsigned contact_id FK
+        bigint_unsigned tag_id FK
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    categories ||--o{ contacts : "has many"
+    contacts ||--o{ contact_tag : "has many"
+    tags ||--o{ contact_tag : "has many"
+```
 
 ## 動作環境
 
@@ -63,7 +136,7 @@
     > 毎回 `./vendor/bin/sail` と入力するのは手間なので、エイリアスを設定すると便利です。
     >
     > ```bash
-    > alias sail=\'[ -f sail ] && bash sail || bash vendor/bin/sail\'
+    > alias sail='[ -f sail ] && bash sail || bash vendor/bin/sail'
     > ```
 
 5. **アプリケーションキーの生成**
@@ -123,7 +196,23 @@
 
     ブラウザで [http://localhost](http://localhost) にアクセスします。
 
+## テスト実行
+
+```bash
+sail artisan test
+```
+
+カバレッジ付きで実行する場合:
+
+```bash
+sail artisan test --coverage
+```
+
 ## 機能一覧
 
 - ユーザー認証（登録、ログイン、ログアウト）
 - お問い合わせ登録・一覧取得・検索・単体取得
+- お問い合わせ詳細表示・削除
+- CSVエクスポート
+- タグ管理（追加・更新・削除）
+- 公開API（お問い合わせCRUD）
