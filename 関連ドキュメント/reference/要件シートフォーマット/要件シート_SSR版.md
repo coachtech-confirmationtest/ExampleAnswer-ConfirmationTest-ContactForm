@@ -600,8 +600,8 @@ erDiagram
 | | 「リセット」ボタンを押す | GET /admin | 検索条件がクリアされ初期状態に戻る | リンク | 基本 |
 | | 「詳細」ボタンを押す | GET /admin/contacts/{contact} | 詳細ページに遷移する | AdminController@show | 基本 |
 | | 「エクスポート」ボタンを押す | GET /contacts/export + query | 検索条件に一致するデータがBOM付きCSVとしてダウンロードされる | ContactController@export, ExportContactRequest | 応用 |
-| | タグを追加する | POST /admin/tags | バリデーション通過時→新しいタグが作成され /admin にリダイレクト。バリデーション失敗時→エラーメッセージが表示される（追加フォーム下に赤文字で表示）。name必須/<=50/ユニーク | TagController@store, StoreTagRequest | 応用 |
-| | タグを更新する | PUT /admin/tags/{tag} | バリデーション通過時→タグ名が更新され /admin にリダイレクト。バリデーション失敗時→エラーメッセージが該当タグの更新フォーム下に赤文字で表示される。name必須/<=50/ユニーク（自身の現在名は許可） | TagController@update, UpdateTagRequest | 応用 |
+| | タグを追加する | POST /admin/tags | バリデーション通過時→新しいタグが作成され /admin にリダイレクト。バリデーション失敗時→エラーメッセージが表示される（追加フォーム下に赤文字で表示）。name必須/<=50/ユニーク<br>エラーメッセージ:<br>　a. 未入力の場合：タグ名を入力してください<br>　b. 50文字を超えた場合：タグ名は50文字以内で入力してください<br>　c. 重複している場合：そのタグ名は既に使用されています | TagController@store, StoreTagRequest | 応用 |
+| | タグを更新する | PUT /admin/tags/{tag} | バリデーション通過時→タグ名が更新され /admin にリダイレクト。バリデーション失敗時→エラーメッセージが該当タグの更新フォーム下に赤文字で表示される。name必須/<=50/ユニーク（自身の現在名は許可）<br>エラーメッセージ:<br>　a. 未入力の場合：タグ名を入力してください<br>　b. 50文字を超えた場合：タグ名は50文字以内で入力してください<br>　c. 重複している場合：そのタグ名は既に使用されています | TagController@update, UpdateTagRequest | 応用 |
 | | タグを削除する | DELETE /admin/tags/{tag} | タグが削除され /admin にリダイレクト | TagController@destroy | 応用 |
 | **お問い合わせ詳細ページ** | 詳細ページが表示される | GET /admin/contacts/{contact} | 氏名・性別・メール・電話・住所・建物名・カテゴリ・お問い合わせ内容が表示される | AdminController@show, admin.show | 基本 |
 | | 「削除」ボタンを押す | DELETE /admin/contacts/{contact} | 該当データが削除され /admin にリダイレクト | AdminController@destroy | 基本 |
