@@ -139,6 +139,7 @@ public function export(ExportContactRequest $request)
         $handle = fopen('php://output', 'w');
         // BOMを追加（Excel対応）
         fwrite($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, ['ID', '氏名', '性別', 'メールアドレス', '電話番号', '住所', '建物名', 'お問い合わせの種類', '詳細', '作成日時']);
         foreach ($contacts as $contact) {
             $genderText = match ($contact->gender) {
                 1 => '男性',
@@ -255,6 +256,13 @@ fwrite($handle, "\xEF\xBB\xBF");
 ```
 
 Excelで日本語CSVを正しく表示するために、UTF-8のBOMをファイルの先頭に書き込みます。これがないと、Excelで開いた時に文字化けが発生します。
+
+**ヘッダー行の出力:**
+```php
+fputcsv($handle, ['ID', '氏名', '性別', 'メールアドレス', '電話番号', '住所', '建物名', 'お問い合わせの種類', '詳細', '作成日時']);
+```
+
+BOMの直後に、CSVの1行目としてヘッダー行を出力します。ヘッダー行があることで、CSVファイルの各列が何のデータであるかが明確になります。
 
 **性別の変換:**
 ```php

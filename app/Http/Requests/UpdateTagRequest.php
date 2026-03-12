@@ -7,8 +7,6 @@ use Illuminate\Validation\Rule;
 
 class UpdateTagRequest extends FormRequest
 {
-    protected $errorBag = 'updateTag';
-
     public function authorize(): bool
     {
         return true;

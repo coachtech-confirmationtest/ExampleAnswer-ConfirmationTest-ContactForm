@@ -6,8 +6,6 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class StoreTagRequest extends FormRequest
 {
-    protected $errorBag = 'storeTag';
-
     public function authorize(): bool
     {
         return true;
