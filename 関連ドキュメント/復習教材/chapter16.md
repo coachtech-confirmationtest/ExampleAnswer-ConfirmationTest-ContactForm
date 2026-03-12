@@ -1095,10 +1095,11 @@ class ContactExportTest extends TestCase
         $this->assertStringContainsString("Mark Brown", $content);
 
         $lines = array_values(array_filter(explode("\n", trim($content))));
-        $firstLine = ltrim($lines[0] ?? "", "\xEF\xBB\xBF");
+        $headerLine = ltrim($lines[0] ?? "", "\xEF\xBB\xBF");
 
-        $this->assertStringContainsString("Mark Brown", $firstLine);
-        $this->assertStringContainsString("Eve Adams", $lines[1] ?? "");
+        $this->assertStringContainsString("ID", $headerLine);
+        $this->assertStringContainsString("Mark Brown", $lines[1] ?? "");
+        $this->assertStringContainsString("Eve Adams", $lines[2] ?? "");
     }
 }
 ```
@@ -1112,7 +1113,8 @@ class ContactExportTest extends TestCase
 - `test_export_without_filters_returns_all_contacts_in_latest_order()`: フィルタを指定しない場合に、全てのデータが最新順でエクスポートされるかをテストします。
 - `explode("\n", trim($content))`: CSVの内容を改行で分割し、各行を配列として取得します。
 - `ltrim($lines[0] ?? "", "\xEF\xBB\xBF")`: 1行目の先頭にある可能性のあるBOM（バイトオーダーマーク）を除去します。
-- 1行目に最新のデータ（`Mark Brown`）が、2行目に古いデータ（`Eve Adams`）が含まれていることを確認し、ソート順を検証します。
+- 1行目がヘッダー行（`ID`を含む）であることを確認します。
+- 2行目に最新のデータ（`Mark Brown`）が、3行目に古いデータ（`Eve Adams`）が含まれていることを確認し、ソート順を検証します。
 
 ### 6.2 Webルートの機能テスト
 

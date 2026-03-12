@@ -73,9 +73,10 @@ class ContactExportTest extends TestCase
         $this->assertStringContainsString('Mark Brown', $content);
 
         $lines = array_values(array_filter(explode("\n", trim($content))));
-        $firstLine = ltrim($lines[0] ?? '', "\xEF\xBB\xBF");
+        $headerLine = ltrim($lines[0] ?? '', "\xEF\xBB\xBF");
 
-        $this->assertStringContainsString('Mark Brown', $firstLine);
-        $this->assertStringContainsString('Eve Adams', $lines[1] ?? '');
+        $this->assertStringContainsString('ID', $headerLine);
+        $this->assertStringContainsString('Mark Brown', $lines[1] ?? '');
+        $this->assertStringContainsString('Eve Adams', $lines[2] ?? '');
     }
 }
