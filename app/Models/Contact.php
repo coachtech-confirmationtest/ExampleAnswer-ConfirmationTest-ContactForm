@@ -11,8 +11,6 @@ class Contact extends Model
 
     /**
      * マスアサインメントで代入を許可する属性。
-     *
-     * @var array<int, string>
      */
     protected $fillable = [
         'category_id',
