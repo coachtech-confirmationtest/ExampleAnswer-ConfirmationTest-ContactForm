@@ -523,6 +523,7 @@ erDiagram
         timestamp created_at
         timestamp updated_at
     }
+    %% UNIQUE(contact_id, tag_id)
 
     categories ||--o{ contacts : "has many"
     contacts ||--o{ contact_tag : "has many"
