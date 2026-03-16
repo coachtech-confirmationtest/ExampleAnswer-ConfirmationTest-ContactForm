@@ -315,7 +315,8 @@ Bladeは提供済みのため、バックエンドの実装に集中してくだ
 | | building | nullable / string / max:255 | 基本 |
 | | category_id | 必須 / integer / exists:categories,id | 基本 |
 | | detail | 必須 / string / max:120 | 基本 |
-| お問い合わせ送信（タグ） | tag_ids[] | array / integer / exists:tags,id | 基本 |
+| お問い合わせ送信（タグ） | tag_ids | nullable / array | 基本 |
+| | tag_ids.* | integer / exists:tags,id | 基本 |
 | 問い合わせ検索・一覧 | keyword | nullable / string / max:255 | 基本 |
 | | gender | nullable / integer / in:0,1,2,3 | 基本 |
 | | category_id | nullable / integer / exists:categories,id | 基本 |
