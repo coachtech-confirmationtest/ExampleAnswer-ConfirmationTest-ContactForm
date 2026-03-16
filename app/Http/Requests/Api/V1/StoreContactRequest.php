@@ -43,7 +43,7 @@ class StoreContactRequest extends FormRequest
             'last_name.required' => '名を入力してください',
             'gender.required' => '性別を選択してください',
             'email.required' => 'メールアドレスを入力してください',
-            'email.email' => 'メールアドレスの形式で入力してください',
+            'email.email' => 'メールアドレスはメール形式で入力してください',
             'tel.required' => '電話番号を入力してください',
             'tel.regex' => '電話番号はハイフンなしの10〜11桁で入力してください',
             'address.required' => '住所を入力してください',

@@ -183,7 +183,7 @@ erDiagram
     ```
     
 
-8. **フロントエンドのビルド**
+7. **フロントエンドのビルド**
 
     ```bash
     sail npm install
@@ -193,7 +193,7 @@ erDiagram
 
     `npm run dev` は開発中は起動したままにしてください。
 
-9. **アプリケーションへのアクセス**
+8. **アプリケーションへのアクセス**
 
     ブラウザで [http://localhost](http://localhost) にアクセスします。
 
