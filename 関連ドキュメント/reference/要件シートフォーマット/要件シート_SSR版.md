@@ -148,22 +148,40 @@ Bladeは提供済みのため、バックエンドの実装に集中してくだ
 | PUT | /api/v1/contacts/{contact} | お問い合わせ更新 | 不要 |
 | DELETE | /api/v1/contacts/{contact} | お問い合わせ削除 | 不要 |
 
-### AP01: お問い合わせ一覧 `GET /api/v1/contacts`
+---
 
-**検索パラメータ:**
+### AP01: お問い合わせ一覧取得
 
-| パラメータ | 型 | 必須 | 説明 | バリデーション |
-|---|---|---|---|---|
-| keyword | string | 任意 | 姓/名/メールの部分一致検索 | nullable, string, max:255 |
-| gender | integer | 任意 | 性別フィルタ（1:男性, 2:女性, 3:その他） | nullable, integer, in:1,2,3 |
-| category_id | integer | 任意 | カテゴリID絞り込み | nullable, integer, exists:categories,id |
-| date | string | 任意 | 作成日フィルタ | nullable, date |
-| page | integer | 任意 | ページ番号（デフォルト: 1） | nullable, integer, min:1 |
-| per_page | integer | 任意 | 1ページあたりの件数（デフォルト: 20、最大: 100） | nullable, integer, min:1, max:100 |
+| 項目 | 内容 |
+|---|---|
+| エンドポイント | /api/v1/contacts |
+| メソッド | GET |
+| 認証 | 不要 |
+| 認可（ポリシー） | - |
+| 説明 | お問い合わせ一覧を取得する。検索・ページネーション対応。 |
+
+**リクエストパラメータ:**
+
+| パラメータ名 | 型 | 必須 | バリデーション | 説明 | 例 |
+|---|---|---|---|---|---|
+| keyword | string | 任意 | nullable, string, max:255 | 姓/名/メールの部分一致検索 | 田中 |
+| gender | integer | 任意 | nullable, integer, in:1,2,3 | 性別フィルタ（1:男性, 2:女性, 3:その他） | 1 |
+| category_id | integer | 任意 | nullable, integer, exists:categories,id | カテゴリID絞り込み | 1 |
+| date | string | 任意 | nullable, date | 作成日フィルタ（YYYY-MM-DD） | 2026-01-15 |
+| page | integer | 任意 | nullable, integer, min:1 | ページ番号（デフォルト: 1） | 2 |
+| per_page | integer | 任意 | nullable, integer, min:1, max:100 | 1ページあたりの件数（デフォルト: 20、最大: 100） | 10 |
 
 > **Web版との差異**: Web管理画面の IndexContactRequest では gender: in:0,1,2,3（0=全て）だが、APIでは in:1,2,3（パラメータ省略=全て）。Web管理画面は paginate(7) 固定だが、APIは per_page パラメータで可変（デフォルト20、最大100）。
 
-**レスポンス: 200 OK**
+**レスポンス:**
+
+| ステータス | 説明 | レスポンスボディ例 |
+|---|---|---|
+| 200 OK | 取得成功 | `{ "data": [...], "meta": { "current_page": 1, "last_page": 3, "per_page": 20, "total": 50 } }` |
+| 422 Unprocessable Entity | バリデーションエラー | `{ "message": "...", "errors": { "gender": ["性別の値が不正です"] } }` |
+
+<details>
+<summary>200 OK レスポンス詳細例</summary>
 
 ```json
 {
@@ -193,54 +211,44 @@ Bladeは提供済みのため、バックエンドの実装に集中してくだ
 }
 ```
 
-### AP02: お問い合わせ詳細 `GET /api/v1/contacts/{contact}`
+</details>
 
-**レスポンス: 200 OK**
+**実装方法/補足:**
 
-```json
-{
-  "data": {
-    "id": 1,
-    "category": { "id": 1, "content": "商品のお届けについて" },
-    "first_name": "山田",
-    "last_name": "太郎",
-    "gender": 1,
-    "email": "yamada@example.com",
-    "tel": "09012345678",
-    "address": "東京都渋谷区1-1-1",
-    "building": "渋谷ビル301",
-    "detail": "配送日について問い合わせます",
-    "tags": [{ "id": 1, "name": "質問" }],
-    "created_at": "2026-03-10T10:00:00.000000Z",
-    "updated_at": "2026-03-10T10:00:00.000000Z"
-  }
-}
-```
+- `Api\V1\ContactController@index`
+- `Api\V1\IndexContactRequest` でバリデーション
+- `Contact::with(['category', 'tags'])` でEager Loading
+- keyword は first_name / last_name / email を orWhere で部分一致検索
+- `latest()->paginate($perPage)` でページネーション（$perPage デフォルト20）
+- `ContactResource::collection()` で返却（meta 付き）
 
-**レスポンス: 404 Not Found**
+---
 
-```json
-{ "error": "お問い合わせが見つかりませんでした。" }
-```
+### AP02: お問い合わせ詳細取得
 
-### AP03: お問い合わせ作成 `POST /api/v1/contacts`
+| 項目 | 内容 |
+|---|---|
+| エンドポイント | /api/v1/contacts/{contact} |
+| メソッド | GET |
+| 認証 | 不要 |
+| 認可（ポリシー） | - |
+| 説明 | 指定IDのお問い合わせ詳細（カテゴリ・タグ含む）を取得する。 |
 
-**リクエストボディ:**
+**リクエストパラメータ:**
 
-| フィールド | 型 | 必須 | バリデーション |
-|---|---|---|---|
-| first_name | string | 必須 | required, string, max:255 |
-| last_name | string | 必須 | required, string, max:255 |
-| gender | integer | 必須 | required, integer, in:1,2,3 |
-| email | string | 必須 | required, string, email, max:255 |
-| tel | string | 必須 | required, string, regex:/^[0-9]{10,11}$/ |
-| address | string | 必須 | required, string, max:255 |
-| building | string | 任意 | nullable, string, max:255 |
-| category_id | integer | 必須 | required, integer, exists:categories,id |
-| detail | string | 必須 | required, string, max:120 |
-| tag_ids | array | 任意 | nullable, array, each: integer, exists:tags,id |
+| パラメータ名 | 型 | 必須 | バリデーション | 説明 | 例 |
+|---|---|---|---|---|---|
+| contact | integer (path) | 必須（URL） | ルートモデルバインディング | お問い合わせID | 5 |
 
-**レスポンス: 201 Created**
+**レスポンス:**
+
+| ステータス | 説明 | レスポンスボディ例 |
+|---|---|---|
+| 200 OK | ContactResource を返却 | `{ "data": { "id": 5, "first_name": "山田", "category": { ... }, "tags": [...] } }` |
+| 404 Not Found | IDが存在しない場合 | `{ "error": "お問い合わせが見つかりませんでした。" }` |
+
+<details>
+<summary>200 OK レスポンス詳細例</summary>
 
 ```json
 {
@@ -262,33 +270,145 @@ Bladeは提供済みのため、バックエンドの実装に集中してくだ
 }
 ```
 
-**レスポンス: 422 Unprocessable Entity（バリデーションエラー）**
+</details>
+
+**実装方法/補足:**
+
+- `Api\V1\ContactController@show`
+- ルートモデルバインディングで `Contact $contact` を取得
+- `$contact->load(['category', 'tags'])` を `ContactResource` でラップ
+- 存在しないIDの場合、`Handler.php` で `ModelNotFoundException` をキャッチしカスタム404を返却
+
+---
+
+### AP03: お問い合わせ登録
+
+| 項目 | 内容 |
+|---|---|
+| エンドポイント | /api/v1/contacts |
+| メソッド | POST |
+| 認証 | 不要 |
+| 認可（ポリシー） | - |
+| 説明 | 問い合わせ内容を新規登録し、任意のタグを紐付ける。 |
+
+**リクエストパラメータ:**
+
+| パラメータ名 | 型 | 必須 | バリデーション | 説明 | 例 |
+|---|---|---|---|---|---|
+| first_name | string | 必須 | required, string, max:255 | 姓 | 山田 |
+| last_name | string | 必須 | required, string, max:255 | 名 | 太郎 |
+| gender | integer | 必須 | required, integer, in:1,2,3 | 性別（1:男性, 2:女性, 3:その他） | 1 |
+| email | string | 必須 | required, string, email, max:255 | メールアドレス | user@example.com |
+| tel | string | 必須 | required, string, regex:/^[0-9]{10,11}$/ | 電話番号（ハイフンなし10-11桁） | 09012345678 |
+| address | string | 必須 | required, string, max:255 | 住所 | 東京都渋谷区1-1-1 |
+| building | string | 任意 | nullable, string, max:255 | 建物名 | 渋谷ビル301 |
+| category_id | integer | 必須 | required, integer, exists:categories,id | お問い合わせ分類のID | 1 |
+| detail | string | 必須 | required, string, max:120 | お問い合わせ内容 | 商品の配送日について |
+| tag_ids | array | 任意 | nullable, array / tag_ids.*: integer, exists:tags,id | 紐付けるタグIDの配列 | [1, 3] |
+
+**レスポンス:**
+
+| ステータス | 説明 | レスポンスボディ例 |
+|---|---|---|
+| 201 Created | 作成成功 | `{ "data": { "id": 21, "first_name": "山田", "category": { ... }, "tags": [...] } }` |
+| 422 Unprocessable Entity | バリデーションエラー | `{ "message": "姓を入力してください (and 7 more errors)", "errors": { "first_name": [...] } }` |
+
+<details>
+<summary>201 Created レスポンス詳細例</summary>
 
 ```json
 {
-  "message": "姓を入力してください (and 7 more errors)",
-  "errors": {
-    "first_name": ["姓を入力してください"],
-    "last_name": ["名を入力してください"]
+  "data": {
+    "id": 21,
+    "category": { "id": 1, "content": "商品のお届けについて" },
+    "first_name": "山田",
+    "last_name": "太郎",
+    "gender": 1,
+    "email": "yamada@example.com",
+    "tel": "09012345678",
+    "address": "東京都渋谷区1-1-1",
+    "building": "渋谷ビル301",
+    "detail": "配送日について問い合わせます",
+    "tags": [{ "id": 1, "name": "質問" }],
+    "created_at": "2026-03-10T10:00:00.000000Z",
+    "updated_at": "2026-03-10T10:00:00.000000Z"
   }
 }
 ```
 
-### AP04: お問い合わせ更新 `PUT /api/v1/contacts/{contact}`
+</details>
 
-リクエストボディはAP03と同一。
+**実装方法/補足:**
 
-**レスポンス: 200 OK** — AP02と同一構造（更新後のデータ）
+- `Api\V1\ContactController@store`
+- `Api\V1\StoreContactRequest` で入力検証
+- `Contact::create($validated)` 後、`$contact->tags()->attach($tagIds)` でタグ紐付け
+- `$contact->load(['category', 'tags'])` を `ContactResource` でラップし 201 で返却
 
-**レスポンス: 404 Not Found** — AP02と同一
+---
 
-**レスポンス: 422 Unprocessable Entity** — AP03と同一
+### AP04: お問い合わせ更新
 
-### AP05: お問い合わせ削除 `DELETE /api/v1/contacts/{contact}`
+| 項目 | 内容 |
+|---|---|
+| エンドポイント | /api/v1/contacts/{contact} |
+| メソッド | PUT |
+| 認証 | 不要 |
+| 認可（ポリシー） | - |
+| 説明 | 既存のお問い合わせ内容を更新し、タグを同期する。 |
 
-**レスポンス: 204 No Content** — レスポンスボディなし
+**リクエストパラメータ:**
 
-**レスポンス: 404 Not Found** — AP02と同一
+AP03と同一のリクエストボディ。パスパラメータとして `contact`（お問い合わせID）が必要。
+
+**レスポンス:**
+
+| ステータス | 説明 | レスポンスボディ例 |
+|---|---|---|
+| 200 OK | 更新成功（更新後のデータ） | AP02の200と同一構造 |
+| 404 Not Found | IDが存在しない場合 | `{ "error": "お問い合わせが見つかりませんでした。" }` |
+| 422 Unprocessable Entity | バリデーションエラー | AP03の422と同一構造 |
+
+**実装方法/補足:**
+
+- `Api\V1\ContactController@update`
+- `Api\V1\UpdateContactRequest` で入力検証（StoreContactRequest と同一ルール）
+- `$contact->update($validated)` 後、`$contact->tags()->sync($tagIds)` でタグ同期
+- `$contact->load(['category', 'tags'])` を `ContactResource` でラップし 200 で返却
+
+---
+
+### AP05: お問い合わせ削除
+
+| 項目 | 内容 |
+|---|---|
+| エンドポイント | /api/v1/contacts/{contact} |
+| メソッド | DELETE |
+| 認証 | 不要 |
+| 認可（ポリシー） | - |
+| 説明 | 指定IDのお問い合わせおよび紐付くタグ関連を削除する。 |
+
+**リクエストパラメータ:**
+
+| パラメータ名 | 型 | 必須 | バリデーション | 説明 | 例 |
+|---|---|---|---|---|---|
+| contact | integer (path) | 必須（URL） | ルートモデルバインディング | お問い合わせID | 5 |
+
+**レスポンス:**
+
+| ステータス | 説明 | レスポンスボディ例 |
+|---|---|---|
+| 204 No Content | 削除成功 | （空ボディ） |
+| 404 Not Found | IDが存在しない場合 | `{ "error": "お問い合わせが見つかりませんでした。" }` |
+
+**実装方法/補足:**
+
+- `Api\V1\ContactController@destroy`
+- ルートモデルバインディングで `Contact $contact` を取得
+- `$contact->delete()`（contact_tag は外部キーの cascade により自動削除）
+- `response()->json(null, 204)` を返却
+
+---
 
 ### API Resource構造
 
