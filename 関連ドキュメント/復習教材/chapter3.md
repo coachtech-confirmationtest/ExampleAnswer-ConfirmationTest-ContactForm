@@ -2,7 +2,7 @@
 
 ## 🎯 このセクションで学ぶこと
 
-このチャプターでは、データベースのテーブルとPHPのプログラムを繋ぐ「通訳者」の役割を果たす、**Eloquentモデル**を作成します。さらに、モデル間に「関連」を定義する**リレーション**を設定することで、`Contact`（お問い合わせ）と`Category`（カテゴリー）のように、関連するデータを直感的に扱えるようにする方法を学びます。これにより、複雑なSQLを書くことなく、オブジェクト指向の考え方でスマートにデータを操作できるようになります。
+このチャプターでは、データベースのテーブルとPHPのプログラムを繋ぐ「通訳者」の役割を果たす、**Eloquentモデル**を作成します。さらに、モデル間に「関連」を定義する**リレーション**を設定することで、`Contact`（お問い合わせ）と`Category`（カテゴリー）の一対多リレーション、そして`Contact`と`Tag`（タグ）の**多対多リレーション**（`belongsToMany`）を含め、関連するデータを直感的に扱えるようにする方法を学びます。これにより、複雑なSQLを書くことなく、オブジェクト指向の考え方でスマートにデータを操作できるようになります。
 
 ## 1. はじめに 📖
 
@@ -24,6 +24,7 @@
 | :--- | :--- | :--- |
 | `Category` | `categories` | お問い合わせの種類を表現するモデル。 |
 | `Contact` | `contacts` | 一件のお問い合わせ情報を表現するモデル。 |
+| `Tag` | `tags` | お問い合わせに付与するタグ情報を表現するモデル。 |
 
 ### モデル間のリレーション（関係性）
 
@@ -31,11 +32,14 @@
 
 - **「1対多」の関係**: 1つの`Category`は、複数の`Contact`を持つことができます。（例: 「商品について」というカテゴリーに、複数のお問い合わせが紐づく）
 - **「多対1」の関係**: 1つの`Contact`は、必ず1つの`Category`に属します。
+- **「多対多」の関係**: 1つの`Contact`は、複数の`Tag`を持つことができます。逆に、1つの`Tag`は、複数の`Contact`に紐づくことができます。
 
 この関係をLaravelでは以下のように表現します。
 
 - `Category` **has many** `Contact` (カテゴリーはたくさんのコンタクトを持つ)
 - `Contact` **belongs to** `Category` (コンタクトはカテゴリーに属する)
+- `Contact` **belongs to many** `Tag` (コンタクトはたくさんのタグを持つ)
+- `Tag` **belongs to many** `Contact` (タグはたくさんのコンタクトに紐づく)
 
 このリレーションをモデルに定義することで、`$contact->category->content`のように、いとも簡単に関連するモデルのデータにアクセスできるようになります。
 
@@ -74,13 +78,21 @@ $categoryName = $contact->category->content;
 
 と書くだけで済みます。`$contact->category`と書くだけで、Laravelが自動的に関連する`Category`モデルを取得してくれるのです。これは非常に直感的で、まるで英語の文章を読んでいるかのように自然です。さらに、後述する**Eager Loading**というテクニックと組み合わせることで、パフォーマンスの問題（N+1問題）を解決することもできます。リレーションの定義は、未来の自分やチームメンバーがコードを読みやすく、メンテナンスしやすくするための「先行投資」なのです。
 
+### Point 5: `belongsTo` vs `belongsToMany` → 中間テーブルの有無で判断する
+
+リレーションを定義する際、どのメソッド（`hasMany`, `belongsTo`, `belongsToMany`など）を使うべきか迷うことがあります。判断基準は非常にシンプルで、「**2つのテーブルの間に中間テーブルが存在するかどうか**」です。`contacts`と`categories`のように中間テーブルがなく、`contacts`テーブルが`category_id`を持っている場合は「一対多」なので`belongsTo`や`hasMany`を使います。一方、`contacts`と`tags`のように、`contact_tag`という中間テーブルを介して関係している場合は「多対多」なので`belongsToMany`を使います。
+
+### Point 6: 中間テーブルのタイムスタンプを忘れない → `withTimestamps()`
+
+多対多リレーションでよくある間違いの一つが、`withTimestamps()`メソッドの呼び出し忘れです。中間テーブルに`created_at`と`updated_at`カラムを用意しただけでは、データが紐付けられたりしたときに、これらのタイムスタンプは自動で更新されません。リレーション定義の際に`->withTimestamps()`とチェーンしておくことで初めて、Laravelはリレーション操作時にこれらのタイムスタンプを自動的に管理してくれます。
+
 ## 4. 実装 🚀
 
-それでは、`Category`と`Contact`の2つのモデルを作成し、リレーションを定義していきましょう。
+それでは、`Category`、`Contact`、`Tag`の3つのモデルを作成し、リレーションを定義していきましょう。
 
 ### 4.1. モデルファイルの作成
 
-以下の`sail artisan`コマンドで、`Category`モデルと`Contact`モデルのファイルを生成します。
+以下の`sail artisan`コマンドで、`Category`モデル、`Contact`モデル、`Tag`モデルのファイルを生成します。
 
 ```bash
 # Categoryモデルを作成
@@ -88,9 +100,12 @@ sail artisan make:model Category
 
 # Contactモデルを作成
 sail artisan make:model Contact
+
+# Tagモデルを作成
+sail artisan make:model Tag
 ```
 
-このコマンドを実行すると、`app/Models/`ディレクトリに`Category.php`と`Contact.php`というファイルが作成されます。
+このコマンドを実行すると、`app/Models/`ディレクトリに`Category.php`、`Contact.php`、`Tag.php`というファイルが作成されます。
 
 ### 4.2. `Category.php`の編集
 
@@ -158,6 +173,49 @@ class Contact extends Model
     {
         return $this->belongsTo(Category::class);
     }
+
+    /**
+     * このお問い合わせに紐付けられている全てのタグを取得
+     */
+    public function tags()
+    {
+        return $this->belongsToMany(Tag::class)->withTimestamps();
+    }
+}
+```
+
+### 4.4. `Tag.php`の編集
+
+作成された`app/Models/Tag.php`に、マスアサインメントの設定と`contacts`リレーションを追加します。
+
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class Tag extends Model
+{
+    use HasFactory;
+
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
+    protected $fillable = [
+        'name',
+    ];
+
+    /**
+     * このタグが紐付けられている全てのお問い合わせを取得
+     */
+    public function contacts()
+    {
+        return $this->belongsToMany(Contact::class)->withTimestamps();
+    }
 }
 ```
 
@@ -186,6 +244,18 @@ class Contact extends Model
 - **`public function category()`**: `Contact`モデルと`Category`モデルの「多対1」のリレーションを定義します。メソッド名は、関連するモデルの単数形（`category`）にするのが規約です。
 
 - **`return $this->belongsTo(Category::class);`**: 「1つの`Contact`は、1つの`Category`に属する（`belongs to`）」という関係性を定義しています。Laravelは賢く、メソッド名`category`から、関連を紐付けるための外部キーが`category_id`であると自動的に判断します。これにより、`$contact->category`のようにして、そのお問い合わせが属するカテゴリーの情報を簡単に取得できます。
+
+### `app/Models/Tag.php` の解説
+
+- **`protected $fillable = ['name'];`**: `name`カラムへのマスアサインメントを許可しています。`Tag::create(['name' => '新しいタグ'])`のように、配列を使って値をモデルに設定する際に必要です。
+
+- **`public function contacts()`**: `Tag`モデルと`Contact`モデルの多対多リレーションを定義しています。メソッド名は、関連するモデルの複数形（`contacts`）にするのがLaravelの規約です。
+
+- **`return $this->belongsToMany(Contact::class)->withTimestamps();`**: 多対多リレーションの定義です。`belongsToMany(Contact::class)`で`Tag`が`Contact`と多対多の関係にあることを宣言し、Laravelの規約に従っていれば中間テーブル名（`contact_tag`）やキー名は自動推測されます。`->withTimestamps()`で中間テーブルのタイムスタンプを自動更新します。
+
+### `app/Models/Contact.php` の `tags()` リレーション
+
+- **`public function tags()`**: `Contact`モデルと`Tag`モデルの多対多リレーションを定義しています。`Tag`モデルの`contacts()`と対になるリレーションで、`$contact->tags`のように関連するタグにアクセスできます。こちらも`withTimestamps()`を付けています。
 
 ## 6. How to: この実装にたどり着くための調べ方 🧐
 
@@ -311,5 +381,7 @@ D. コードの解説
 - **モデルの役割**: SQLを隠蔽し、PHPのオブジェクトとして直感的にデータベースを操作できる「通訳者」であることを学びました。
 - **マスアサインメントの防御**: `$fillable`プロパティを設定することで、意図しないデータ更新を防ぐセキュリティの基本を実践しました。
 - **リレーションの定義**: `hasMany`と`belongsTo`を使い、モデル同士の関係性を定義しました。これにより、コードの可読性が向上し、関連データへのアクセスが容易になりました。
+- **多対多リレーション**: `belongsToMany`メソッドを使って、`Contact`モデルと`Tag`モデルの間に双方向の多対多リレーションを定義しました。
+- **`withTimestamps()`**: 中間テーブルのタイムスタンプを自動更新するための設定を学びました。
 
 これで、プログラムの世界からデータベースのデータを自由に、かつ安全に操作するための準備が整いました。次のチャプターでは、アプリケーションの「関所の番人」として、ユーザーからの不正なリクエストをブロックする**認証機能**を実装していきます。

@@ -22,8 +22,9 @@
 | :--- | :--- |
 | **`UserSeeder`** | ログイン認証に使用するテストユーザーを1件作成する。<br>例: `name`='Test User', `email`='test@example.com', `password`='password' |
 | **`CategorySeeder`** | お問い合わせの種類を登録する。<br>例: 「商品のお届けについて」「商品の交換について」「商品トラブル」「ショップへのお問い合わせ」「その他」 |
-| **`ContactSeeder`** | 1. `Category`をランダムに選択する。<br>2. Fakerを使い、リアルな個人情報（姓名、性別、メールアドレス、電話番号、住所など）を生成する。<br>3. 上記のデータを使って、`Contact`モデルのインスタンスを複数（例: 20件）作成し、データベースに保存する。 |
-| **`DatabaseSeeder`** | `UserSeeder`, `CategorySeeder`, `ContactSeeder`を正しい順序で呼び出す。 |
+| **`TagSeeder`** | タグのマスターデータ（「質問」「要望」「不具合報告」「ご意見」「その他」の5件）を作成する。`firstOrCreate`を使い、冪等性を保証する。 |
+| **`ContactSeeder`** | 1. `Category`をランダムに選択する。<br>2. Fakerを使い、リアルな個人情報（姓名、性別、メールアドレス、電話番号、住所など）を生成する。<br>3. 上記のデータを使って、`Contact`モデルのインスタンスを複数（例: 20件）作成し、データベースに保存する。<br>4. 各Contactにランダムで1〜3件のタグを`attach`で紐付ける。 |
+| **`DatabaseSeeder`** | `UserSeeder`, `CategorySeeder`, `TagSeeder`, `ContactSeeder`を正しい順序で呼び出す。 |
 
 ## 3. 先輩エンジニアの思考プロセス 💭
 
@@ -107,7 +108,45 @@ class CategorySeeder extends Seeder
 }
 ```
 
-### 4.3. `ContactSeeder`の作成と編集
+### 4.3. `TagSeeder`の作成と編集
+
+```bash
+sail artisan make:seeder TagSeeder
+```
+
+作成された`database/seeders/TagSeeder.php`を以下のように編集します。
+
+```php
+<?php
+
+namespace Database\Seeders;
+
+use App\Models\Tag;
+use Illuminate\Database\Seeder;
+
+class TagSeeder extends Seeder
+{
+    /**
+     * Run the database seeds.
+     */
+    public function run(): void
+    {
+        $tags = [
+            ["name" => "質問"],
+            ["name" => "要望"],
+            ["name" => "不具合報告"],
+            ["name" => "ご意見"],
+            ["name" => "その他"],
+        ];
+
+        foreach ($tags as $tag) {
+            Tag::firstOrCreate($tag);
+        }
+    }
+}
+```
+
+### 4.4. `ContactSeeder`の作成と編集
 
 ```bash
 sail artisan make:seeder ContactSeeder
@@ -120,10 +159,11 @@ sail artisan make:seeder ContactSeeder
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\Contact;
 use App\Models\Category;
+use App\Models\Contact;
+use App\Models\Tag;
 use Faker\Factory as Faker;
+use Illuminate\Database\Seeder;
 
 class ContactSeeder extends Seeder
 {
@@ -134,10 +174,11 @@ class ContactSeeder extends Seeder
     {
         $faker = Faker::create('ja_JP');
         $categories = Category::all();
+        $tags = Tag::all();
 
         // サンプルデータを20件作成
         for ($i = 0; $i < 20; $i++) {
-            Contact::create([
+            $contact = Contact::create([
                 'first_name' => $faker->lastName,
                 'last_name' => $faker->firstName,
                 'gender' => $faker->numberBetween(1, 3),
@@ -148,12 +189,18 @@ class ContactSeeder extends Seeder
                 'category_id' => $categories->random()->id,
                 'detail' => $faker->realText(120),
             ]);
+
+            // タグをランダムに1〜3件紐付け
+            if ($tags->isNotEmpty()) {
+                $randomTags = $tags->random(rand(1, min(3, $tags->count())));
+                $contact->tags()->attach($randomTags->pluck('id'));
+            }
         }
     }
 }
 ```
 
-### 4.4. `DatabaseSeeder`の編集
+### 4.5. `DatabaseSeeder`の編集
 
 `database/seeders/DatabaseSeeder.php`を開き、`run`メソッドのコメントアウトを解除し、作成したシーダーを呼び出すように編集します。
 
@@ -175,13 +222,14 @@ class DatabaseSeeder extends Seeder
         $this->call([
             UserSeeder::class,
             CategorySeeder::class,
+            TagSeeder::class,
             ContactSeeder::class,
         ]);
     }
 }
 ```
 
-### 4.5. マイグレーションとシーディングの実行
+### 4.6. マイグレーションとシーディングの実行
 
 最後に、以下のコマンドを実行して、データベースのテーブルを一度すべて削除してから再作成し、その後、定義したシーダーを実行してテストデータを投入します。
 
@@ -216,8 +264,18 @@ sail artisan migrate:fresh --seed
 - **`'category_id' => $categories->random()->id`**: 先ほど取得したカテゴリーのコレクションから、`random()`メソッドでランダムに1つの`Category`モデルを取得し、その`id`プロパティを参照しています。
 - **`'detail' => $faker->realText(120)`**: 実際のラテン語の単語を組み合わせて、自然な見た目の日本語のテキストを約120文字生成します。
 
+### `database/seeders/TagSeeder.php` の解説
+- **`Tag::firstOrCreate($tag)`**: `$tag`配列と同じデータがテーブルに存在しない場合のみ、新しいレコードとして作成します。`db:seed`コマンドを何度実行しても同じデータが重複して登録されるのを防ぐためです。シーダーが冪等性（べきとうせい：何度実行しても結果が同じになる性質）を持つことは重要です。
+
+### `database/seeders/ContactSeeder.php` の解説（タグ紐付け部分）
+- **`$tags = Tag::all();`**: `tags`テーブルの全レコードを取得します。ループ外で一度だけ取得することで、パフォーマンスを向上させます。
+- **`$contact = Contact::create([...]);`**: `Contact::create()`の戻り値を`$contact`変数に格納し、後続のタグ紐付けに使います。
+- **`$tags->random(rand(1, min(3, $tags->count())))`**: タグのコレクションからランダムに1〜3件を取得します。
+- **`$contact->tags()->attach($randomTags->pluck('id'));`**: `attach()`メソッドで中間テーブル（`contact_tag`）にレコードを作成し、タグを紐付けます。
+
 ### `database/seeders/DatabaseSeeder.php` の解説
 - **`$this->call([...])`**: `run`メソッド内で`$this->call()`メソッドを使うことで、他のシーダークラスを呼び出すことができます。配列で渡したシーダーが、上から順番に実行されます。依存関係がある場合は、呼び出し順序が重要です（例: `ContactSeeder`は`CategorySeeder`の後に実行する必要がある）。
+- **実行順序の重要性**: `TagSeeder`を`ContactSeeder`よりも前に配置することで、`ContactSeeder`が実行される時点では既に`tags`テーブルにデータが存在する状態を保証します。
 
 ## 6. How to: この実装にたどり着くための調べ方 🗺️
 
@@ -339,10 +397,12 @@ sail artisan migrate:fresh --seed
 2. `categories`テーブルに5件のカテゴリーが登録されていること
 3. `contacts`テーブルに20件のダミーデータが登録されていること
 4. 各`contacts`レコードの`category_id`が、`categories`テーブルに存在するIDであること
+5. `tags`テーブルに5件のタグデータ（質問、要望、不具合報告、ご意見、その他）が登録されていること
+6. `contact_tag`テーブルに、各Contactへのタグ紐付けデータが存在すること
 
 ## 8. まとめ ✨
 
-このチャプターでは、SeederとFakerを使って、リアルなテストデータをコマンド一つで自動生成する方法を学びました。これにより、効率的で信頼性の高いテスト環境を構築しました。Factoryを使わずにSeeder内で直接データを生成する方法は、処理がシンプルでわかりやすいというメリットがあります。一方、Factoryを使うとテストコードでのダミーデータ生成が容易になります（Chapter 15で詳しく学びます）。
+このチャプターでは、SeederとFakerを使って、リアルなテストデータをコマンド一つで自動生成する方法を学びました。これにより、効率的で信頼性の高いテスト環境を構築しました。Factoryを使わずにSeeder内で直接データを生成する方法は、処理がシンプルでわかりやすいというメリットがあります。一方、Factoryを使うとテストコードでのダミーデータ生成が容易になります（Chapter 11で詳しく学びます）。
 
 - **Seederの活用**: テストデータを自動生成し、開発効率を向上させました。
 - **Fakerの活用**: ロケールを設定し、リアルなダミーデータを生成しました。

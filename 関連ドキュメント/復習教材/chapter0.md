@@ -164,7 +164,22 @@ erDiagram
         timestamp created_at
         timestamp updated_at
     }
+    tags {
+        bigint id PK
+        string name
+        timestamp created_at
+        timestamp updated_at
+    }
+    contact_tag {
+        bigint id PK
+        bigint contact_id FK
+        bigint tag_id FK
+        timestamp created_at
+        timestamp updated_at
+    }
     categories ||--o{ contacts : ""
+    contacts ||--o{ contact_tag : ""
+    tags ||--o{ contact_tag : ""
 ```
 ````
 

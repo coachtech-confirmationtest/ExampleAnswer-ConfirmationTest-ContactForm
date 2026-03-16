@@ -1,459 +1,808 @@
-# Chapter 11: タグ機能の実装（モデルとリレーション）
-
-## 🎯 このセクションで学ぶこと
-
-前チャプターで、タグ機能のデータベース設計という「器」を用意しました。このチャプターでは、その器をLaravelのEloquent ORMから自在に操作するための「モデル」と「リレーション」を定義します。具体的には、`tags`テーブルに対応する`Tag`モデルを作成し、`Contact`モデルと`Tag`モデルの間で「多対多」の関係性を定義します。このリレーション定義により、SQLのJOIN句を意識することなく、`$contact->tags`のようにオブジェクト指向的で直感的なコードで、関連するデータを簡単に取得できるようになります。
+# Chapter 11: 応用編 - 公開APIの提供 🌐
 
 ## 1. はじめに 📖
 
-### モデルとリレーションの役割とは？
+このチャプターでは、これまでBlade（SSR）で構築してきたお問い合わせ管理システムに、**公開API**を追加します。
 
-Eloquentモデルは、データベースのテーブルと1対1で対応し、そのテーブルに対する操作をカプセル化（一つにまとめる）する役割を持ちます。これにより、私たちは`DB::table('contacts')->...`のようなSQLに近いコードではなく、`Contact::find(1)`のように、より表現力豊かでオブジェクト指向的なコードでデータベースを操作できます。
+### APIとは？
 
-そして、リレーションは、モデルとモデルの関係性を定義するものです。例えば、「この`Contact`は一つの`Category`に属している（`belongsTo`）」や、「この`Contact`は複数の`Tag`を持っている（`belongsToMany`）」といった関係をコードで表現します。リレーションを一度定義してしまえば、Laravelは舞台裏で自動的に適切なJOINクエリを生成し、関連するモデルのデータを取得してくれます。これにより、開発者は複雑なSQLを組み立てる手間から解放され、アプリケーションのビジネスロジックそのものに集中することができるのです。
+API（Application Programming Interface）とは、アプリケーション同士がデータをやり取りするための「窓口」です。Webアプリケーションでは一般的に、**JSON形式**でデータを送受信するHTTPベースのAPIを指します。
 
-このチャプターで定義する「多対多リレーション」は、Eloquentリレーションの中でも特に強力な機能の一つです。その仕組みと使い方をマスターすることで、より複雑で柔軟なデータ構造をエレガントに扱うことができるようになります。
+これまで実装してきたWebアプリケーションは、ブラウザに**HTML**を返す仕組みでした。一方、APIは**JSONデータ**を返します。これにより、モバイルアプリや他のWebサービス、フロントエンドフレームワーク（React、Vue.jsなど）からデータを取得・操作できるようになります。
 
-## 2. 要件の確認 📋
+### なぜWebアプリにAPIを追加するのか？
 
-このチャプターで実装するモデルとリレーションの具体的な要件を整理します。
+実務では、1つのバックエンドが複数のクライアント（Webブラウザ、スマホアプリ、外部サービス）にデータを提供するケースが非常に多くあります。APIを提供することで、同じデータやビジネスロジックを再利用できます。
 
-| モデル | 要件 |
-| :--- | :--- |
-| **`Tag`モデル** | 1. `tags`テーブルに対応するEloquentモデルを作成する。<br>2. `name`カラムへのマスアサインメントを許可する。<br>3. `Contact`モデルとの多対多リレーション（`contacts()`メソッド）を定義する。 |
-| **`Contact`モデル** | 1. `Tag`モデルとの多対多リレーション（`tags()`メソッド）を定義する。 |
+### このチャプターで学ぶこと
 
-このリレーション定義により、以下のようなデータアクセスが可能になることを目指します。
+- **API Resources** — EloquentモデルをJSON形式に変換する仕組み
+- **API用FormRequest** — Web版とは別のバリデーションルール
+- **API用コントローラー** — JSON応答、HTTPステータスコード（200, 201, 204, 404, 422）
+- **APIルーティング** — `routes/api.php` と `/api` プレフィックスの仕組み
 
-- `$contact = Contact::find(1);`
-- `$tags = $contact->tags;` // ID:1の問い合わせに紐づく全てのタグを取得
+---
 
-- `$tag = Tag::find(5);`
-- `$contacts = $tag->contacts;` // ID:5のタグを持つ全ての問い合わせを取得
+## 2. 要件確認 📋
 
-## 3. 先輩エンジニアの思考プロセス 💭
+今回実装するAPIの要件を確認しましょう。
 
-モデルにリレーションを定義する際、経験豊富なエンジニアはどのような点を意識しているのでしょうか。
+### エンドポイント一覧
 
-### Point 1: なぜリレーションを定義するのか？ → SQLの抽象化
+| HTTPメソッド | URI | 説明 |
+|---|---|---|
+| GET | `/api/v1/contacts` | お問い合わせ一覧（検索・ページネーション付き） |
+| GET | `/api/v1/contacts/{contact}` | お問い合わせ詳細 |
+| POST | `/api/v1/contacts` | お問い合わせ新規作成 |
+| PUT | `/api/v1/contacts/{contact}` | お問い合わせ更新 |
+| DELETE | `/api/v1/contacts/{contact}` | お問い合わせ削除 |
 
-最大の理由は、データベース操作を抽象化し、コードの可読性と保守性を高めるためです。もしリレーションがなければ、ある問い合わせに紐づくタグを取得するためには、毎回`DB::table('contacts')->join('contact_tag', ...)->join('tags', ...)`のようなJOIN句を含む複雑なクエリを自分で書かなければなりません。これは面倒なだけでなく、タイプミスによるバグの温床にもなります。リレーションを定義すれば、これらの処理はすべて`$contact->tags`という一言に隠蔽されます。内部的に実行されるSQLは同じでも、コード上はビジネスロジックが明確になり、誰が読んでも理解しやすいコードになるのです。
+### 設計方針
 
-### Point 2: `belongsTo` vs `belongsToMany` → 中間テーブルの有無で判断する
+- **認証不要**: 公開APIとして、認証なしでアクセスできる（Sanctumは使用しない）
+- **API Resources使用**: EloquentモデルのJSON変換にAPI Resourcesを使用する
+- **Web版と分離**: コントローラー・FormRequestはAPI専用のものを `Api\V1` 名前空間に作成する
+- **バージョニング**: `/api/v1/` プレフィックスでAPIバージョンを管理する
 
-リレーションを定義する際、どのメソッド（`hasMany`, `belongsTo`, `belongsToMany`など）を使うべきか迷うことがあります。判断基準は非常にシンプルで、「**2つのテーブルの間に中間テーブルが存在するかどうか**」です。`contacts`と`categories`のように中間テーブルがなく、`contacts`テーブルが`category_id`を持っている場合は「一対多」なので`belongsTo`や`hasMany`を使います。一方、今回の`contacts`と`tags`のように、`contact_tag`という中間テーブルを介して関係している場合は「多対多」なので`belongsToMany`を使います。この判断を間違えるとリレーションは正しく機能しません。
+> **💡 なぜWeb版と分離するのか？**
+>
+> Web版のコントローラーはBladeビューを返し、FormRequestのgenderルールは `in:0,1,2,3`（0=全て）です。
+> API版はJSONを返し、genderは `in:1,2,3`（パラメータ省略=全て）です。
+> レスポンス形式やバリデーションルールが異なるため、責務を分離します。
 
-### Point 3: 規約の力を最大限に活用する
+---
 
-前チャプターで中間テーブルを`contact_tag`という規約通りの名前にしたメリットが、ここで活きてきます。Laravelの`belongsToMany`メソッドは、何も引数を指定しない場合、関連するモデル名（`Contact`と`Tag`）から、中間テーブル名を`contact_tag`、外部キーを`contact_id`と`tag_id`であると自動的に推測してくれます。規約に従うことで、私たちは`$this->belongsToMany(Tag::class)`と書くだけでリレーションを定義できます。もし規約から外れたテーブル名やキー名を使っている場合は、`belongsToMany`メソッドの第2引数以降でそれらを明示的に指定する必要があり、コードが少し冗長になります。
+## 3. API Resourcesの作成 🎨
 
-### Point 4: 中間テーブルのタイムスタンプを忘れない → `withTimestamps()`
+API Resourcesは、EloquentモデルをJSON形式に変換する「変換レイヤー」です。モデルの全カラムをそのまま返すのではなく、APIとして公開したいフィールドだけを選択的に返せます。
 
-多対多リレーションでよくある間違いの一つが、`withTimestamps()`メソッドの呼び出し忘れです。中間テーブルに`created_at`と`updated_at`カラムを用意しただけでは、データが紐付けられたり解除されたりしたときに、これらのタイムスタンプは自動で更新されません。リレーション定義の際に`->withTimestamps()`とチェーンしておくことで初めて、Laravelはリレーション操作時にこれらのタイムスタンプを自動的に管理してくれるようになります。「いつデータが関連付けられたか」という情報はデバッグや監査ログとして非常に有用なため、特別な理由がない限りは必ず付けておくべきです。
+### 3-1. CategoryResourceの作成
 
-## 4. 実装 🚀
-
-それでは、`Tag`モデルを作成し、各モデルにリレーションを定義していきましょう。
-
-### 4.1. `Tag`モデルの作成
-
-Artisanコマンドで`Tag`モデルを生成します。
+まず、カテゴリ用のAPI Resourceを作成します。
 
 ```bash
-sail artisan make:model Tag
+sail artisan make:resource CategoryResource
 ```
 
-### 4.2. `Tag`モデルの編集
+**app/Http/Resources/CategoryResource.php**
+```php
+<?php
 
-生成された`app/Models/Tag.php`に、マスアサインメントの設定と`contacts`リレーションを追加します。
+namespace App\Http\Resources;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class CategoryResource extends JsonResource
+{
+    /**
+     * Transform the resource into an array.
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(Request $request): array
+    {
+        return [
+            'id' => $this->id,
+            'content' => $this->content,
+        ];
+    }
+}
+```
+
+#### コード解説
+- `JsonResource` を継承し、`toArray()` メソッドでJSON出力するフィールドを定義します。
+- `$this->id` や `$this->content` は、元のCategoryモデルのプロパティにアクセスしています。
+- `created_at` や `updated_at` はAPIとして不要なので含めていません。
+
+### 3-2. TagResourceの作成
+
+```bash
+sail artisan make:resource TagResource
+```
+
+**app/Http/Resources/TagResource.php**
+```php
+<?php
+
+namespace App\Http\Resources;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class TagResource extends JsonResource
+{
+    public function toArray(Request $request): array
+    {
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+        ];
+    }
+}
+```
+
+### 3-3. ContactResourceの作成
+
+ContactResourceは、リレーションデータ（category, tags）もネストして返します。
+
+```bash
+sail artisan make:resource ContactResource
+```
+
+**app/Http/Resources/ContactResource.php**
+```php
+<?php
+
+namespace App\Http\Resources;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class ContactResource extends JsonResource
+{
+    public function toArray(Request $request): array
+    {
+        return [
+            'id' => $this->id,
+            'category' => new CategoryResource($this->whenLoaded('category')),
+            'first_name' => $this->first_name,
+            'last_name' => $this->last_name,
+            'gender' => $this->gender,
+            'email' => $this->email,
+            'tel' => $this->tel,
+            'address' => $this->address,
+            'building' => $this->building,
+            'detail' => $this->detail,
+            'tags' => TagResource::collection($this->whenLoaded('tags')),
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
+        ];
+    }
+}
+```
+
+#### コード解説
+- `new CategoryResource($this->whenLoaded('category'))`: categoryリレーションが**ロード済みの場合のみ**出力します。`whenLoaded()` を使うことで、リレーションが未ロードの場合にN+1問題を引き起こすのを防ぎます。
+- `TagResource::collection($this->whenLoaded('tags'))`: tagsリレーションをTagResourceのコレクションとして出力します。
+- `created_at`, `updated_at`: Laravelが自動的にISO 8601形式（`2026-03-10T10:00:00.000000Z`）に変換します。
+
+> **💡 `whenLoaded()` とは？**
+>
+> `whenLoaded('relation')` は、そのリレーションが `with()` で事前にロード（Eager Loading）されている場合にのみ値を返します。ロードされていない場合はキーごと省略されます。これにより、コントローラー側で `with()` を書き忘れた場合に、意図せずN+1クエリが発生するのを防げます。
+
+---
+
+## 4. API用FormRequestの作成 📝
+
+### 4-1. 一覧検索用: IndexContactRequest
+
+Web版の `IndexContactRequest` とは異なるバリデーションルールを定義します。
+
+```bash
+sail artisan make:request Api/V1/IndexContactRequest
+```
+
+作成された `app/Http/Requests/Api/V1/IndexContactRequest.php` を以下のように編集します。
+
+**app/Http/Requests/Api/V1/IndexContactRequest.php**
+```php
+<?php
+
+namespace App\Http\Requests\Api\V1;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class IndexContactRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            'keyword' => ['nullable', 'string', 'max:255'],
+            'gender' => ['nullable', 'integer', 'in:1,2,3'],
+            'category_id' => ['nullable', 'integer', 'exists:categories,id'],
+            'date' => ['nullable', 'date'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'keyword.max' => 'キーワードは255文字以内で入力してください',
+            'gender.in' => '性別の値が不正です',
+            'category_id.exists' => '選択されたカテゴリーが存在しません',
+            'date.date' => '日付の形式が正しくありません',
+            'per_page.max' => '1ページあたりの件数は100件以内で指定してください',
+        ];
+    }
+}
+```
+
+#### Web版との差異
+
+| 項目 | Web版 (`App\Http\Requests`) | API版 (`App\Http\Requests\Api\V1`) |
+|---|---|---|
+| 名前空間 | `App\Http\Requests` | `App\Http\Requests\Api\V1` |
+| gender | `in:0,1,2,3`（0=全て） | `in:1,2,3`（省略=全て） |
+| per_page | なし（固定7件） | `min:1, max:100`（デフォルト20件） |
+| page | なし | `min:1` |
+
+Web版ではHTMLのselectボックスで「全て（0）」を送信しますが、APIではパラメータを省略することで「全て」を表現します。
+
+### 4-2. 作成用: StoreContactRequest
+
+```bash
+sail artisan make:request Api/V1/StoreContactRequest
+```
+
+作成された `app/Http/Requests/Api/V1/StoreContactRequest.php` を以下のように編集します。
+
+**app/Http/Requests/Api/V1/StoreContactRequest.php**
+```php
+<?php
+
+namespace App\Http\Requests\Api\V1;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class StoreContactRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            'first_name' => ['required', 'string', 'max:255'],
+            'last_name' => ['required', 'string', 'max:255'],
+            'gender' => ['required', 'integer', 'in:1,2,3'],
+            'email' => ['required', 'string', 'email', 'max:255'],
+            'tel' => ['required', 'string', 'regex:/^[0-9]{10,11}$/'],
+            'address' => ['required', 'string', 'max:255'],
+            'building' => ['nullable', 'string', 'max:255'],
+            'category_id' => ['required', 'integer', 'exists:categories,id'],
+            'detail' => ['required', 'string', 'max:120'],
+            'tag_ids' => ['nullable', 'array'],
+            'tag_ids.*' => ['integer', 'exists:tags,id'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'first_name.required' => '姓を入力してください',
+            'last_name.required' => '名を入力してください',
+            'gender.required' => '性別を選択してください',
+            'email.required' => 'メールアドレスを入力してください',
+            'email.email' => 'メールアドレスの形式で入力してください',
+            'tel.required' => '電話番号を入力してください',
+            'tel.regex' => '電話番号はハイフンなしの10〜11桁で入力してください',
+            'address.required' => '住所を入力してください',
+            'category_id.required' => 'お問い合わせの種類を選択してください',
+            'detail.required' => 'お問い合わせ内容を入力してください',
+            'detail.max' => 'お問い合わせ内容は120文字以内で入力してください',
+        ];
+    }
+}
+```
+
+バリデーションルール自体はWeb版の `StoreContactRequest` と同一ですが、**名前空間が異なります**。Web版とAPI版で将来的にルールが分岐する可能性を考慮し、別クラスとして作成しています。
+
+### 4-3. 更新用: UpdateContactRequest
+
+```bash
+sail artisan make:request Api/V1/UpdateContactRequest
+```
+
+作成された `app/Http/Requests/Api/V1/UpdateContactRequest.php` を以下のように編集します。StoreContactRequestと同一のルールです。更新時もすべてのフィールドを必須とするフルリプレース方式（PUT）を採用しています。
+
+**app/Http/Requests/Api/V1/UpdateContactRequest.php**
 
 ```php
 <?php
 
-namespace App\Models;
+namespace App\Http\Requests\Api\V1;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Http\FormRequest;
 
-class Tag extends Model
+class UpdateContactRequest extends FormRequest
 {
-    use HasFactory;
+    public function authorize(): bool
+    {
+        return true;
+    }
 
+    public function rules(): array
+    {
+        return [
+            'first_name' => ['required', 'string', 'max:255'],
+            'last_name' => ['required', 'string', 'max:255'],
+            'gender' => ['required', 'integer', 'in:1,2,3'],
+            'email' => ['required', 'string', 'email', 'max:255'],
+            'tel' => ['required', 'string', 'regex:/^[0-9]{10,11}$/'],
+            'address' => ['required', 'string', 'max:255'],
+            'building' => ['nullable', 'string', 'max:255'],
+            'category_id' => ['required', 'integer', 'exists:categories,id'],
+            'detail' => ['required', 'string', 'max:120'],
+            'tag_ids' => ['nullable', 'array'],
+            'tag_ids.*' => ['integer', 'exists:tags,id'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'first_name.required' => '姓を入力してください',
+            'last_name.required' => '名を入力してください',
+            'gender.required' => '性別を選択してください',
+            'email.required' => 'メールアドレスを入力してください',
+            'email.email' => 'メールアドレスの形式で入力してください',
+            'tel.required' => '電話番号を入力してください',
+            'tel.regex' => '電話番号はハイフンなしの10〜11桁で入力してください',
+            'address.required' => '住所を入力してください',
+            'category_id.required' => 'お問い合わせの種類を選択してください',
+            'detail.required' => 'お問い合わせ内容を入力してください',
+            'detail.max' => 'お問い合わせ内容は120文字以内で入力してください',
+        ];
+    }
+}
+```
+
+> **💡 PUTとPATCHの違い**
+>
+> REST APIでは、`PUT` はリソースの**全体置換**、`PATCH` は**部分更新**を意味します。今回は `PUT` を採用しているため、更新時もすべてのフィールドを送信する必要があります。`PATCH` を使う場合は、各ルールを `sometimes` にして「送信されたフィールドのみバリデーション」にする設計もあります。
+
+---
+
+## 5. API用コントローラーの作成 🎮
+
+API用のコントローラーは `Api\V1` 名前空間に配置し、Web用コントローラーと完全に分離します。
+
+```bash
+sail artisan make:controller Api/V1/ContactController
+```
+
+作成された `app/Http/Controllers/Api/V1/ContactController.php` を以下のように編集します。
+
+**app/Http/Controllers/Api/V1/ContactController.php**
+```php
+<?php
+
+namespace App\Http\Controllers\Api\V1;
+
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\IndexContactRequest;
+use App\Http\Requests\Api\V1\StoreContactRequest;
+use App\Http\Requests\Api\V1\UpdateContactRequest;
+use App\Http\Resources\ContactResource;
+use App\Models\Contact;
+
+class ContactController extends Controller
+{
+    public function index(IndexContactRequest $request)
+    {
+        $query = Contact::with(['category', 'tags']);
+
+        if ($request->filled('keyword')) {
+            $keyword = $request->keyword;
+            $query->where(function ($q) use ($keyword) {
+                $q->where('first_name', 'like', "%{$keyword}%")
+                    ->orWhere('last_name', 'like', "%{$keyword}%")
+                    ->orWhere('email', 'like', "%{$keyword}%");
+            });
+        }
+
+        if ($request->filled('gender')) {
+            $query->where('gender', $request->gender);
+        }
+
+        if ($request->filled('category_id')) {
+            $query->where('category_id', $request->category_id);
+        }
+
+        if ($request->filled('date')) {
+            $query->whereDate('created_at', $request->date);
+        }
+
+        $perPage = $request->input('per_page', 20);
+        $contacts = $query->latest()->paginate($perPage);
+
+        return ContactResource::collection($contacts);
+    }
+
+    public function show(Contact $contact)
+    {
+        $contact->load(['category', 'tags']);
+
+        return new ContactResource($contact);
+    }
+
+    public function store(StoreContactRequest $request)
+    {
+        $validated = $request->validated();
+        $tagIds = $validated['tag_ids'] ?? [];
+        unset($validated['tag_ids']);
+
+        $contact = Contact::create($validated);
+
+        if (! empty($tagIds)) {
+            $contact->tags()->attach($tagIds);
+        }
+
+        $contact->load(['category', 'tags']);
+
+        return (new ContactResource($contact))
+            ->response()
+            ->setStatusCode(201);
+    }
+
+    public function update(UpdateContactRequest $request, Contact $contact)
+    {
+        $validated = $request->validated();
+        $tagIds = $validated['tag_ids'] ?? [];
+        unset($validated['tag_ids']);
+
+        $contact->update($validated);
+        $contact->tags()->sync($tagIds);
+
+        $contact->load(['category', 'tags']);
+
+        return new ContactResource($contact);
+    }
+
+    public function destroy(Contact $contact)
+    {
+        $contact->delete();
+
+        return response()->json(null, 204);
+    }
+}
+```
+
+### コード解説
+
+#### indexメソッド（一覧取得）
+- Web版の `AdminController@index` と検索ロジックは同じですが、Bladeビューではなく `ContactResource::collection()` でJSON応答を返します。
+- `paginate($perPage)` により、Laravelが自動的に `data` 配列と `meta`（ページネーション情報）をJSON応答に含めます。
+- Web版はgenderが `0` のとき全件表示ですが、API版はgenderパラメータを**省略**することで全件表示になります。
+
+#### showメソッド（詳細取得）
+- `Contact $contact` でルートモデルバインディングを使用し、存在しないIDの場合は自動的に404例外がスローされます。
+- `$contact->load(['category', 'tags'])` でリレーションをEager Loadingし、`new ContactResource($contact)` でJSON変換します。
+
+#### storeメソッド（新規作成）
+- Web版の `ContactController@store` と同じビジネスロジック（Contact作成 + タグ紐付け）ですが、リダイレクトの代わりに**201 Created** ステータスでJSONレスポンスを返します。
+- `->response()->setStatusCode(201)` でHTTPステータスコードを明示的に設定しています。
+
+#### updateメソッド（更新）
+- `$contact->update($validated)` でモデルを更新します。
+- `$contact->tags()->sync($tagIds)` で、タグの関連を **同期** します。`attach()` は追加のみですが、`sync()` は「指定されたIDだけが関連付けられた状態」にします（不要な関連は自動削除）。
+
+#### destroyメソッド（削除）
+- `$contact->delete()` でレコードを削除し、**204 No Content**（レスポンスボディなし）を返します。
+- 204はREST APIにおいて「処理は成功したが、返すデータはない」ことを意味するステータスコードです。
+
+> **💡 HTTPステータスコードの使い分け**
+>
+> | コード | 意味 | 使用場面 |
+> |---|---|---|
+> | 200 OK | 成功 | 取得・更新成功時 |
+> | 201 Created | 作成成功 | 新規リソース作成時 |
+> | 204 No Content | 成功（ボディなし） | 削除成功時 |
+> | 404 Not Found | 未検出 | リソースが存在しない時 |
+> | 422 Unprocessable Entity | バリデーションエラー | 入力値が不正な時 |
+
+---
+
+## 6. ルート定義 🛤️
+
+APIルートは `routes/api.php` に定義します。
+
+**routes/api.php**
+```php
+<?php
+
+use App\Http\Controllers\Api\V1\ContactController;
+use Illuminate\Support\Facades\Route;
+
+Route::prefix('v1')->group(function () {
+    Route::apiResource('contacts', ContactController::class);
+});
+```
+
+### コード解説
+
+- `Route::prefix('v1')`: URLに `/v1` プレフィックスを追加します。
+- `Route::apiResource('contacts', ...)`: RESTfulな5つのルート（index, show, store, update, destroy）を一括定義します。`Route::resource()` との違いは、`create` と `edit`（HTMLフォーム表示用）が含まれないことです。
+
+> **💡 `/api` プレフィックスの自動付与**
+>
+> `routes/api.php` に定義したルートには、Laravelが自動的に `/api` プレフィックスを付与します。そのため、`prefix('v1')` の `apiResource('contacts')` は、実際には `/api/v1/contacts` というURLになります。
+>
+> この設定は `app/Providers/RouteServiceProvider.php` の `boot()` メソッドで行われています。
+
+### ルーティングの確認
+
+定義したルートを確認するには、以下のコマンドを実行します。
+
+```bash
+sail artisan route:list --path=api
+```
+
+以下のようなルートが表示されるはずです。
+
+```
+  GET|HEAD  api/v1/contacts ............ contacts.index
+  POST      api/v1/contacts ............ contacts.store
+  GET|HEAD  api/v1/contacts/{contact} .. contacts.show
+  PUT|PATCH api/v1/contacts/{contact} .. contacts.update
+  DELETE    api/v1/contacts/{contact} .. contacts.destroy
+```
+
+---
+
+## 7. 404エラーハンドリング 🚨
+
+存在しないIDにアクセスした場合、カスタムエラーメッセージをJSON形式で返すようにします。
+
+**app/Exceptions/Handler.php** に `render()` メソッドを追加します。
+
+```php
+<?php
+
+namespace App\Exceptions;
+
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Http\Request;
+use Throwable;
+
+class Handler extends ExceptionHandler
+{
     /**
-     * The attributes that are mass assignable.
+     * The list of the inputs that are never flashed to the session on validation exceptions.
      *
      * @var array<int, string>
      */
-    protected $fillable = [
-        'name',
+    protected $dontFlash = [
+        'current_password',
+        'password',
+        'password_confirmation',
     ];
 
     /**
-     * このタグが紐付けられている全てのお問い合わせを取得
+     * Register the exception handling callbacks for the application.
      */
-    public function contacts()
+    public function register(): void
     {
-        return $this->belongsToMany(Contact::class)->withTimestamps();
+        $this->reportable(function (Throwable $e) {
+            //
+        });
+    }
+
+    /**
+     * Render an exception into an HTTP response.
+     */
+    public function render($request, Throwable $e)
+    {
+        if ($request->is('api/*') && $e instanceof ModelNotFoundException) {
+            return response()->json([
+                'error' => 'お問い合わせが見つかりませんでした。',
+            ], 404);
+        }
+
+        return parent::render($request, $e);
     }
 }
 ```
 
-### 4.3. `TagSeeder`の作成
+### コード解説
 
-次に、タグの初期データを投入するためのシーダーを作成します。
+- `render()` メソッドをオーバーライドし、例外のレスポンス変換をカスタマイズしています。
+- `$e instanceof ModelNotFoundException`: ルートモデルバインディングでモデルが見つからない場合、Laravelは `ModelNotFoundException` をスローします。この例外を直接捕捉してJSON応答を返します。
+- `$request->is('api/*')`: APIリクエスト（`/api/` で始まるURL）の場合のみカスタムレスポンスを返します。Web画面のリクエストには影響しません。
+- `return parent::render($request, $e)`: 上記の条件に合致しない例外は、親クラスのデフォルト処理に委譲します。
+
+Handler.phpを編集した後は、以下のコマンドを実行してキャッシュをクリアしてください。Docker/Sail環境では、PHPのOPcache（コンパイル済みコードのキャッシュ）が古いコードを保持し続けることがあり、編集が反映されない場合があります。
 
 ```bash
-sail artisan make:seeder TagSeeder
+sail artisan optimize:clear
 ```
 
-生成された`database/seeders/TagSeeder.php`を以下のように編集します。
+---
 
-```php
-<?php
+## 8. 動作確認（Postman） 🔍
 
-namespace Database\Seeders;
+実装したAPIが正しく動作するか、Postmanを使って確認しましょう。
 
-use App\Models\Tag;
-use Illuminate\Database\Seeder;
+### 8-1. 一覧取得: GET /api/v1/contacts
 
-class TagSeeder extends Seeder
+1. Postmanで「New Request」を作成します。
+2. HTTPメソッドを **GET** に設定します。
+3. URLに `http://localhost/api/v1/contacts` を入力します。
+4. 「Send」ボタンをクリックします。
+
+**確認ポイント:**
+- ステータスコードが **200 OK** であること
+- レスポンスボディに `"data"` 配列と `"meta"` オブジェクト（current_page, last_page, per_page, total）が含まれること
+
+### 8-2. 検索パラメータ付き一覧: GET /api/v1/contacts?keyword=...
+
+1. HTTPメソッドを **GET** のまま、URLに `http://localhost/api/v1/contacts` を入力します。
+2. 「Params」タブをクリックし、以下のクエリパラメータを追加します。
+
+| KEY | VALUE |
+|---|---|
+| per_page | 5 |
+
+3. 「Send」をクリックします。
+
+**確認ポイント:**
+- ステータスコードが **200 OK** であること
+- `"meta"` の `per_page` が `5` であること
+- `"data"` 配列に最大5件のデータが含まれること
+
+続けて、`keyword` パラメータも試してみましょう。一覧レスポンスの `"data"` 配列から任意のContactの `first_name` の値をコピーし、以下のように設定します。
+
+| KEY | VALUE |
+|---|---|
+| keyword | （コピーした姓） |
+
+**確認ポイント:**
+- `"data"` 配列に、指定したキーワードに一致するContactのみが含まれること
+- キーワードは姓（first_name）、名（last_name）、メールアドレス（email）の部分一致で検索されること
+
+### 8-3. 詳細取得: GET /api/v1/contacts/1
+
+1. HTTPメソッドを **GET** に設定します。
+2. URLに `http://localhost/api/v1/contacts/1` を入力します。
+3. 「Send」をクリックします。
+
+**確認ポイント:**
+- ステータスコードが **200 OK** であること
+- `"data"` オブジェクト内に `"category"` と `"tags"` がネストされて含まれること
+
+### 8-4. 新規作成: POST /api/v1/contacts
+
+1. HTTPメソッドを **POST** に変更します。
+2. URLに `http://localhost/api/v1/contacts` を入力します。
+3. 「Headers」タブをクリックし、以下のヘッダーを追加します。
+
+| KEY | VALUE |
+|---|---|
+| Accept | application/json |
+
+4. 「Body」タブをクリックし、「raw」を選択、ドロップダウンで「JSON」を選びます。
+5. 以下のJSONを入力します。
+
+```json
 {
-    /**
-     * Run the database seeds.
-     */
-    public function run(): void
-    {
-        $tags = [
-            ["name" => "質問"],
-            ["name" => "要望"],
-            ["name" => "不具合報告"],
-            ["name" => "ご意見"],
-            ["name" => "その他"],
-        ];
-
-        foreach ($tags as $tag) {
-            Tag::firstOrCreate($tag);
-        }
-    }
+    "first_name": "テスト",
+    "last_name": "太郎",
+    "gender": 1,
+    "email": "test-api@example.com",
+    "tel": "09012345678",
+    "address": "東京都渋谷区1-1-1",
+    "building": "テストビル101",
+    "category_id": 1,
+    "detail": "APIからの問い合わせです",
+    "tag_ids": [1, 2]
 }
 ```
 
-### 4.4. `DatabaseSeeder`の編集
+6. 「Send」をクリックします。
 
-`database/seeders/DatabaseSeeder.php`を編集して、`TagSeeder`が実行されるように登録します。`ContactSeeder`よりも前に実行されるように記述してください。
+**確認ポイント:**
+- ステータスコードが **201 Created** であること
+- レスポンスボディに作成されたリソースのJSONが返ること
+- `"tags"` 配列に指定したタグが含まれていること
+- phpMyAdminで `contacts` テーブルにレコードが追加され、`contact_tag` テーブルにも紐付けレコードが作成されていること
 
-```php
-<?php
+### 8-5. 更新: PUT /api/v1/contacts/{id}
 
-namespace Database\Seeders;
+1. HTTPメソッドを **PUT** に変更します。
+2. URLに `http://localhost/api/v1/contacts/1` を入力します（`1` は更新したいContactのIDに置き換えてください）。
+3. 「Headers」タブで `Accept: application/json` ヘッダーが設定されていることを確認します。
+4. 「Body」タブで「raw」→「JSON」を選択し、以下のJSONを入力します。
 
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
-use Illuminate\Database\Seeder;
-
-class DatabaseSeeder extends Seeder
+```json
 {
-    /**
-     * Seed the application's database.
-     */
-    public function run(): void
-    {
-        $this->call([
-            UserSeeder::class,
-            CategorySeeder::class,
-            TagSeeder::class, // ここに追加
-            ContactSeeder::class,
-        ]);
-    }
+    "first_name": "更新",
+    "last_name": "太郎",
+    "gender": 2,
+    "email": "updated@example.com",
+    "tel": "08011112222",
+    "address": "大阪府大阪市1-2-3",
+    "category_id": 1,
+    "detail": "更新されたお問い合わせです",
+    "tag_ids": [3, 4]
 }
 ```
 
-### 4.5. `ContactSeeder`の編集
+5. 「Send」をクリックします。
 
-`TagSeeder`でタグのマスターデータが作成されるようになったので、`ContactSeeder`を編集して、各Contactにランダムにタグを紐付けるようにします。
+**確認ポイント:**
+- ステータスコードが **200 OK** であること
+- レスポンスボディに更新後のデータが反映されていること
+- `"tags"` 配列が更新後のタグ（`tag_ids` で指定したもの）に置き換わっていること（`sync()` による同期）
 
-`database/seeders/ContactSeeder.php`を以下のように編集します。
+### 8-6. 削除: DELETE /api/v1/contacts/{id}
 
-```php
-<?php
+1. HTTPメソッドを **DELETE** に変更します。
+2. URLに `http://localhost/api/v1/contacts/1` を入力します（`1` は削除したいContactのIDに置き換えてください）。
+3. 「Send」をクリックします。
 
-namespace Database\Seeders;
+**確認ポイント:**
+- ステータスコードが **204 No Content** であること
+- レスポンスボディが空であること
+- phpMyAdminで該当レコードが削除されていること
 
-use App\Models\Category;
-use App\Models\Contact;
-use App\Models\Tag;
-use Faker\Factory as Faker;
-use Illuminate\Database\Seeder;
+### 8-7. 存在しないIDへのアクセス（404確認）
 
-class ContactSeeder extends Seeder
+1. HTTPメソッドを **GET** に設定します。
+2. URLに `http://localhost/api/v1/contacts/9999` を入力します。
+3. 「Headers」タブで `Accept: application/json` ヘッダーが設定されていることを確認します。
+4. 「Send」をクリックします。
+
+**確認ポイント:**
+- ステータスコードが **404 Not Found** であること
+- レスポンスボディが以下のJSONであること
+
+```json
 {
-    /**
-     * Run the database seeds.
-     */
-    public function run(): void
-    {
-        $faker = Faker::create('ja_JP');
-        $categories = Category::all();
-        $tags = Tag::all();
-
-        // サンプルデータを20件作成
-        for ($i = 0; $i < 20; $i++) {
-            $contact = Contact::create([
-                'first_name' => $faker->lastName,
-                'last_name' => $faker->firstName,
-                'gender' => $faker->numberBetween(1, 3),
-                'email' => $faker->unique()->safeEmail,
-                'tel' => $faker->numerify('###########'),
-                'address' => $faker->prefecture . $faker->city . $faker->streetAddress,
-                'building' => $faker->optional()->secondaryAddress,
-                'category_id' => $categories->random()->id,
-                'detail' => $faker->realText(120),
-            ]);
-
-            // タグをランダムに1〜3件紐付け
-            if ($tags->isNotEmpty()) {
-                $randomTags = $tags->random(rand(1, min(3, $tags->count())));
-                $contact->tags()->attach($randomTags->pluck('id'));
-            }
-        }
-    }
+    "error": "お問い合わせが見つかりませんでした。"
 }
 ```
 
-**変更点（chapter5で作成した時点との差分）:**
-- `use App\Models\Tag;` を追加
-- `$tags = Tag::all();` でタグ一覧を取得
-- `Contact::create()` の戻り値を `$contact` 変数に格納するように変更
-- ループ内で `$contact->tags()->attach()` によりランダムにタグを紐付け
-
-### 4.6. `Contact`モデルの編集
-
-既存の`app/Models/Contact.php`に、`tags`リレーションを追加します。
-
-```php
-<?php
-
-namespace App\Models;
-
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
-
-class Contact extends Model
-{
-    use HasFactory;
-
-    protected $fillable = [
-        'category_id',
-        'first_name',
-        'last_name',
-        'gender',
-        'email',
-        'tel',
-        'address',
-        'building',
-        'detail',
-    ];
-
-    public function category()
-    {
-        return $this->belongsTo(Category::class);
-    }
-
-    /**
-     * このお問い合わせに紐付けられている全てのタグを取得
-     */
-    public function tags()
-    {
-        return $this->belongsToMany(Tag::class)->withTimestamps();
-    }
-}
-```
-
-### 4.7. マイグレーションとシーディングの実行
-
-ここまでの実装が完了したら、マイグレーションとシーディングを実行して、データベースにタグのテーブルとデータを反映させます。
-
-```bash
-sail artisan migrate:fresh --seed
-```
-
-> **注意**: `migrate:fresh` は全テーブルを削除して再作成するコマンドです。既存のデータは全て削除されますので、必要なデータがある場合はバックアップを取ってください。開発環境ではシーダーでデータを再投入するため問題ありません。
-
-実行後、phpMyAdminなどで以下を確認してみましょう。
-
-- `tags` テーブルが作成され、5件の初期データ（質問、要望、不具合報告、ご意見、その他）が入っていること
-- `contact_tag` テーブル（中間テーブル）が作成され、各Contactにタグが紐付けられていること（レコードが存在すること）
-
-## 5. コードの詳細解説 🔍
-
-### `app/Models/Tag.php` の解説
-
-- **`protected $fillable = ['name'];`**
-  - **何をしているか**: `name`カラムへのマスアサインメントを許可しています。
-  - **なぜそう書くか**: マスアサインメントとは、`Tag::create(['name' => '新しいタグ'])`のように、配列を使って一度に複数の値をモデルに設定する機能です。Laravelはデフォルトでこの機能を無効化しており、意図しないカラム（例えば`is_admin`など）がリクエスト経由で勝手に更新されるのを防ぎます。`$fillable`配列にカラム名を指定することで、そのカラムへのマスアサインメントを明示的に許可し、安全性を確保します。
-
-- **`public function contacts()`**
-  - **何をしているか**: `Tag`モデルと`Contact`モデルの多対多リレーションを定義しています。
-  - **なぜそう書くか**: メソッド名は、関連するモデルの複数形（`contacts`）にするのがLaravelの規約です。これにより、`$tag->contacts`のように直感的に関連データを取得できます。
-
-- **`return $this->belongsToMany(Contact::class)->withTimestamps();`**
-  - **何をしているか**: 多対多リレーションの具体的な設定を行っています。
-  - **なぜそう書くか**:
-    - `belongsToMany(Contact::class)`: `Tag`モデルが`Contact`モデルと多対多の関係にあることをEloquentに伝えます。Laravelの規約に従っていれば、中間テーブル名（`contact_tag`）やキー名（`tag_id`, `contact_id`）は自動的に推測されます。
-    - `->withTimestamps()`: リレーションを操作（`attach`や`sync`など）した際に、中間テーブルの`created_at`と`updated_at`を自動で更新するように設定します。「いつデータが関連付けられたか」という情報はデバッグや監査に役立つため、必須の記述です。
-
-### `database/seeders/TagSeeder.php` の解説
-
-- **`Tag::firstOrCreate($tag)`**
-  - **何をしているか**: `$tag`配列と同じデータがテーブルに存在しない場合のみ、新しいレコードとして作成します。
-  - **なぜそう書くか**: `db:seed`コマンドを何度実行しても同じデータが重複して登録されるのを防ぐためです。シーダーが冪等性（べきとうせい：何度実行しても結果が同じになる性質）を持つことは、安定した開発環境を維持するために非常に重要です。
-
-### `database/seeders/ContactSeeder.php` の解説（タグ紐付け部分）
-
-- **`$tags = Tag::all();`**
-  - **何をしているか**: `tags`テーブルの全レコードを取得し、コレクションとして`$tags`に格納します。
-  - **なぜそう書くか**: ループ内で毎回DBにアクセスするのではなく、ループ外で一度だけ取得することで、パフォーマンスを向上させます。
-
-- **`$contact = Contact::create([...]);`**
-  - **何が変わったか**: chapter5で作成した時点では`Contact::create([...]);`の戻り値を使用していませんでしたが、タグを紐付けるために`$contact`変数に格納するように変更しました。
-
-- **`$tags->random(rand(1, min(3, $tags->count())))`**
-  - **何をしているか**: タグのコレクションからランダムに1〜3件を取得します。`min(3, $tags->count())`により、タグが3件未満の場合でもエラーにならないようにしています。
-  - **なぜそう書くか**: 実際のフォーム入力に近いデータを生成するためです。全てのContactに同じタグが紐付くのではなく、ランダムに異なるタグが紐付くことで、管理画面やAPIで確認した際にリアルなデータとなります。
-
-- **`$contact->tags()->attach($randomTags->pluck('id'));`**
-  - **何をしているか**: `$contact`のタグリレーションに対して、ランダムに選んだタグのIDを紐付けます。`pluck('id')`でIDの配列を取得し、`attach()`で中間テーブル（`contact_tag`）にレコードを作成します。
-  - **なぜそう書くか**: `attach()`はリレーション定義で学んだ`belongsToMany`の操作メソッドです。シーダーで使うことで、初期データの段階からContactとTagの紐付けが確認できる状態になります。
-
-### `database/seeders/DatabaseSeeder.php` の解説
-
-- **`$this->call([...])`**
-  - **何をしているか**: `db:seed`コマンドが実行されたときに、この配列に登録されたシーダークラスを上から順番に実行します。
-  - **なぜそう書くか**: `TagSeeder`を`ContactSeeder`よりも前に配置することで、`ContactSeeder`が実行される時点では、既に`tags`テーブルにデータが存在している状態を保証します。`ContactSeeder`内で`Tag::all()`を呼び出してタグを紐付けるため、この実行順序が重要です。
-
-### `app/Models/Contact.php` の解説
-
-- **`public function tags()`**
-  - **何をしているか**: `Contact`モデルと`Tag`モデルの多対多リレーションを定義しています。
-  - **なぜそう書くか**: `Tag`モデルの`contacts()`メソッドと対になるリレーションです。これにより、`$contact->tags`のように、`Contact`モデル側からも関連する`Tag`モデルのデータにアクセスできるようになります。こちらも`withTimestamps()`を忘れずに付けておきます。
-
-## 6. How to: この実装にたどり着くための調べ方 🗺️
-
-実務で多対多リレーションを実装する必要が出てきたとき、エンジニアはどのようにAIを活用して学習・実装を進めるのでしょうか。ここでは、4つのステップに分けて、具体的なプロンプト例と共にその思考プロセスを解説します。
-
-### Step 1: 公式ドキュメントを読みやすくまとめる
-
-まずは、公式ドキュメントという一次情報源を元に、多対多リレーションの全体像を掴みます。大量の情報をそのまま読むのは大変なので、AIに要点をまとめてもらいます。
-
-```text
-以下はLaravelの公式ドキュメントの一部です。 これを「Eloquentの多対多リレーションを実装できるように」分かりやすくまとめてください。
-
-出力してほしい内容：
-- 重要ポイント（10行以内）
-- 用語の説明（中間テーブル、belongsToMany）
-- できること / できないこと（境界をはっきり）
-- よくある落とし穴（回避策つき）
-- 最小で動かすための手順（コードはまだ不要）
-
---- ここから ---
-（ここに、Laravel公式ドキュメントの「Eloquent: Relationships」の「Many to Many」セクションの英文または和文を貼り付ける）
---- ここまで ---
-```
-
-**プロンプトの考え方**: このプロンプトの目的は、**学習の全体像を素早く掴む**ことです。いきなり詳細に入らず、重要ポイント、用語、境界、落とし穴、手順といった「地図」を手に入れることで、効率的に学習を進めることができます。
-
-### Step 2: 「なぜそうなる？」をはっきりさせる（理解を固める）
-
-全体像を掴んだら、次は「なぜそのように動くのか」という仕組みの部分を深掘りします。自分の理解が正しいか、AIに壁打ち相手になってもらいます。
-
-```text
-Laravelの多対多リレーションについて、私の理解はこうです：
-「`Contact`モデルと`Tag`モデルを繋ぐために、`contact_tag`という中間テーブルが必要。リレーションを定義するには、両方のモデルに`belongsToMany`メソッドを書く。Laravelが規約に基づいてテーブル名やキー名を自動で判断してくれる。」
-
-お願い：
-1) この理解は正しいですか？間違いがあれば「具体例」で教えてください。
-2) `belongsToMany`メソッドが呼ばれた時、Laravelの内部で何が起きるのかを「入力→中で起きること→出力」で説明してください。
-3) `withTimestamps()`を付けないとどうなりますか？
-4) よくある勘違いを3つ教えてください。
-5) 理解チェック問題を3問ください（答えつき）。
-```
-
-**プロンプトの考え方**: このステップの目的は、**知識を確かなものにする**ことです。自分の言葉で説明した内容をAIにレビューしてもらうことで、理解のズレを修正できます。「入力→処理→出力」や「理解チェック問題」といった形式を指定することで、より構造的で深い理解を得ることができます。
-
-### Step 3: 実装に落とす（指定フォーマット：手順→解説→例→解説）
-
-概念を理解したら、いよいよ実装です。ここでもAIにペアプログラマーになってもらい、段階的にコードを書いていきます。
-
-```text
-目的は、お問い合わせ管理システムにタグ機能を追加することです。`Contact`モデルと`Tag`モデルの多対多リレーションを実装します。
-前提知識は、Laravelのマイグレーションとモデルの基本は理解しています。
-
-次の順番で出力してください：
-
-A. 実装の手順・方針
-- まず全体の方針（なぜそのやり方か）
-- 手順を1〜Nで（各手順に「できたらOK」の条件も書く）
-
-B. 関連技術の解説
-- 必要な関連知識を3つ（マスアサインメント、`withTimestamps`、シーダーの`firstOrCreate`）
-- 各項目は「一言で説明 → この実装で何に使う → 注意点」
-
-C. 実装例
-- まず`Tag`モデルと`Contact`モデルのリレーション定義の最小例
-- 次に`TagSeeder`の実装例
-
-D. コードの解説
-- `belongsToMany`の引数と`withTimestamps`の重要性について
-- なぜ`firstOrCreate`を使うのか
-
-追加で必要な情報があれば質問していいですが、最大3つまでにしてください。
-```
-
-**プロンプトの考え方**: このプロンプトの目的は、**思考のプロセスを言語化しながら実装する**ことです。A→B→C→Dという構造を指定することで、ただコードをコピーするのではなく、「なぜこの手順なのか」「なぜこのコードなのか」を理解しながら進めることができます。
-
-### Step 4: 設計レビュー（指摘をもらう）
-
-最後に、自分が書いたコードや設計が妥当か、第三者の視点（AI）からレビューしてもらいます。
-
-```text
-以下のリレーション定義をレビューしてください。
-
-- 目的：お問い合わせ（Contact）とタグ（Tag）を多対多で紐付ける
-- 設計案：
-  - `Contact`モデルに`tags()`メソッドを定義: `return $this->belongsToMany(Tag::class)->withTimestamps();`
-  - `Tag`モデルに`contacts()`メソッドを定義: `return $this->belongsToMany(Contact::class)->withTimestamps();`
-  - 中間テーブル名は`contact_tag`、キーは`contact_id`, `tag_id`。
-- 不安な点：
-  - `withTimestamps()`を両方に書く必要はありますか？
-  - パフォーマンスは大丈夫でしょうか？
-
-見てほしい観点：
-- 正しく動くか（規約通りか）
-- 保守しやすいか（命名は適切か）
-- パフォーマンス（N+1問題の懸念）
-
-出力：
-- 指摘を「重要度：高/中/低」で出す
-- 各指摘に「理由」「影響」「直し方」をつける
-- 最後に「この設計が失敗しやすい例」を3つ出す
-```
-
-**プロンプトの考え方**: このステップの目的は、**コードの品質を向上させ、潜在的な問題に気づく**ことです。自分の不安な点を具体的に伝えることで、より的確なアドバイスを得られます。「重要度」や「理由・影響・直し方」といったフォーマットを指定することで、レビュー結果を整理し、次のアクションに繋げやすくなります。
-
-## 7. 動作確認 🔍
-
-`sail artisan migrate:fresh --seed`を実行した後、phpMyAdmin（`http://localhost:8080`）で以下を確認してください。
-
-1. `tags`テーブルが作成され、5件のタグデータが登録されていること
-2. `contact_tag`テーブルが作成されていること（この時点ではデータは空で問題ありません）
-
-## 8. まとめ ✨
-
-このチャプターでは、マイグレーションで作成したテーブルに対応するモデルと、モデル間の多対多リレーションを定義しました。
-
-- **モデルの作成**: `make:model`コマンドで`Tag`モデルを作成し、マスアサインメントのための`$fillable`プロパティを設定しました。
-- **多対多リレーションの定義**: `belongsToMany`メソッドを使って、`Contact`モデルと`Tag`モデルの間に双方向のリレーションを定義しました。
-- **規約の重要性**: Laravelの規約に従うことで、リレーション定義が非常にシンプルになることを再確認しました。
-- **中間テーブルのタイムスタンプ**: `withTimestamps()`メソッドを呼び出すことで、中間テーブルのタイムスタンプが自動更新されるように設定しました。
-- **シーダーの作成**: `make:seeder`コマンドで`TagSeeder`を作成し、`firstOrCreate`メソッドを使って重複しない初期データを登録しました。
-
-これで、データベースの構造と、それを操作するためのモデルの準備が整いました。次のチャプターでは、いよいよこれらのモデルとリレーションを使って、タグを管理するための機能（登録・更新・削除）をWebルートとコントローラーで実装していきます。
+### 8-8. バリデーションエラーの確認（422確認）
+
+1. HTTPメソッドを **POST** に変更します。
+2. URLに `http://localhost/api/v1/contacts` を入力します。
+3. 「Headers」タブで `Accept: application/json` ヘッダーが設定されていることを確認します。
+4. 「Body」タブで「raw」→「JSON」を選択し、空のJSONオブジェクト `{}` を入力します。
+5. 「Send」をクリックします。
+
+**確認ポイント:**
+- ステータスコードが **422 Unprocessable Entity** であること
+- レスポンスボディに `"message"` と `"errors"` オブジェクトが含まれ、各必須フィールドのエラーメッセージが表示されること
+
+> **💡 `Accept: application/json` ヘッダーの重要性**
+>
+> POST/PUTリクエストでバリデーションエラーが発生した場合、Laravelは `Accept` ヘッダーを確認して応答形式を決定します。`Accept: application/json` がない場合、Laravelはリダイレクト（302）を返してしまいます。Postmanでは「Headers」タブで `Accept: application/json` を明示的に設定しましょう。
+>
+> なお、GETリクエストやPostmanの「Send」ボタンではデフォルトで `Accept: */*` が送信されますが、GETリクエストの場合はLaravelがJSONを正しく返すため、特に問題ありません。POST/PUT/DELETEの場合は必ず設定してください。
+
+---
+
+## 9. まとめ ✨
+
+お疲れ様でした！このチャプターでは、既存のSSR（Blade）アプリケーションに公開APIを追加し、以下のスキルを習得しました。
+
+- **API Resources** でEloquentモデルをJSON形式に変換する方法
+- **API用コントローラー** の設計とWeb版との分離（名前空間の活用）
+- **routes/api.php** でのルート定義と `/api` プレフィックスの仕組み
+- **HTTPステータスコード** の使い分け（200, 201, 204, 404, 422）
+- **エラーハンドリング** （404でのカスタムJSON応答）
+
+> **💡 コラム: 検索ロジックの共通化**
+>
+> 今回、Web版の `AdminController@index` とAPI版の `Api\V1\ContactController@index` で検索ロジック（keyword, gender, category_id, date のフィルタリング）が重複していることに気づいたかもしれません。
+>
+> 実務では、このような重複を解消するために以下の手法が使われます：
+>
+> 1. **Eloquent Local Scope**: Contactモデルに `scopeSearch($query, $filters)` メソッドを定義し、両コントローラーから `Contact::search($filters)` のように呼び出す
+> 2. **Service層**: `ContactSearchService` クラスを作成し、検索ロジックをカプセル化する
+> 3. **Query Builder クラス**: `ContactQueryBuilder` のような専用クラスで検索条件を組み立てる
+>
+> これらはリファクタリングのテーマとして、ぜひ挑戦してみてください。テストが書かれていれば、リファクタリング後もテストを実行して既存の動作が壊れていないことを確認できます。
+
+次の最終チャプターでは、これまでに実装してきた全ての機能（Web + API）に対する**自動テスト**を実装していきます。一度書けば何度でも同じ検証を瞬時に実行してくれるテストは、品質保証の強力な武器です。

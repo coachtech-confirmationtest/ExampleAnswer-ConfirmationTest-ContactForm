@@ -38,6 +38,10 @@
 | `/admin` | GET | 管理画面ページを表示する | `AdminController@index` |
 | `/admin/contacts/{contact}` | GET | お問い合わせ詳細を表示する | `AdminController@show` |
 | `/admin/contacts/{contact}` | DELETE | お問い合わせを削除する | `AdminController@destroy` |
+| `/admin/tags` | POST | 新しいタグを作成する | `TagController@store` |
+| `/admin/tags/{tag}/edit` | GET | タグの編集画面を表示する | `TagController@edit` |
+| `/admin/tags/{tag}` | PUT | タグを更新する | `TagController@update` |
+| `/admin/tags/{tag}` | DELETE | タグを削除する | `TagController@destroy` |
 
 ## 3. 先輩エンジニアの思考プロセス 💭
 
@@ -75,6 +79,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\TagController;
 
 /*
 |--------------------------------------------------------------------------
@@ -98,6 +103,12 @@ Route::middleware("auth")->group(function () {
     Route::get("/admin", [AdminController::class, "index"]);
     Route::get("/admin/contacts/{contact}", [AdminController::class, "show"]);
     Route::delete("/admin/contacts/{contact}", [AdminController::class, "destroy"]);
+
+    // タグ管理
+    Route::post("/admin/tags", [TagController::class, "store"]);
+    Route::get("/admin/tags/{tag}/edit", [TagController::class, "edit"]);
+    Route::put("/admin/tags/{tag}", [TagController::class, "update"]);
+    Route::delete("/admin/tags/{tag}", [TagController::class, "destroy"]);
 });
 ```
 
@@ -133,6 +144,13 @@ Route::middleware("auth")->group(function () {
 - **`Route::delete("/admin/contacts/{contact}", [AdminController::class, "destroy"])`**
   - **何をしているか**: DELETEメソッドで特定のお問い合わせを削除するルートです。ルートモデルバインディングにより、`{contact}`のIDに対応するモデルが自動的に取得されます。
   - **なぜDELETEメソッドか**: RESTfulなURL設計では、リソースの削除には`DELETE`メソッドを使います。HTMLフォームはGETとPOSTしかサポートしないため、Bladeテンプレートでは`@method("DELETE")`ディレクティブを使ってDELETEメソッドを擬似的に実現します。
+
+### タグ管理ルートの解説
+
+- **`Route::post("/admin/tags", [TagController::class, "store"])`**: 新しいタグを作成するルートです。管理画面の新規作成フォームからPOSTで送信されます。
+- **`Route::get("/admin/tags/{tag}/edit", [TagController::class, "edit"])`**: タグの編集画面を表示するルートです。ルートモデルバインディングにより、`{tag}`のIDに対応する`Tag`モデルが自動取得されます。
+- **`Route::put("/admin/tags/{tag}", [TagController::class, "update"])`**: タグを更新するルートです。Bladeテンプレートの`@method('PUT')`ディレクティブによりPUTメソッドが擬似的に送信されます。
+- **`Route::delete("/admin/tags/{tag}", [TagController::class, "destroy"])`**: タグを削除するルートです。`@method('DELETE')`ディレクティブによりDELETEメソッドが擬似的に送信されます。
 
 ## 6. How to: この実装にたどり着くための調べ方 🗺️
 
@@ -254,6 +272,12 @@ Route::middleware("auth")->group(function () {
 7. 一覧から詳細ページに遷移し、お問い合わせ内容が表示されること
 8. お問い合わせの削除が正常に動作すること
 
+**タグ管理（認証必須ページ）**
+9. 管理画面でタグの一覧が表示されること
+10. 新しいタグを追加できること
+11. タグの編集ページに遷移し、タグ名を更新できること
+12. タグを削除できること
+
 ## 8. まとめ ✨
 
 このチャプターでは、アプリケーションの交通網であるルーティングを定義しました。
@@ -263,4 +287,4 @@ Route::middleware("auth")->group(function () {
 -   **ルートグループによる認証制御**: `Route::middleware("auth")->group(...)`を使って管理画面のルートをグループ化し、未認証ユーザーからのアクセスを一括で制限しました。
 -   **ルートモデルバインディング**: URLのパラメータ（`{contact}`）から自動でモデルを取得する便利な機能を活用しました。
 
-これで、バックエンドのすべての部品（モデル、ビュー、コントローラー、ルート）が繋がり、アプリケーションの基本的な骨格が完成しました。次のチャプターでは、お問い合わせにタグを付与するための**タグ機能のデータベース設計（マイグレーション）**を行います。
+これで、バックエンドのすべての部品（モデル、ビュー、コントローラー、ルート）が繋がり、アプリケーションの基本的な骨格が完成しました。次のチャプターでは、応用機能であるCSVエクスポートの実装に進みます。
