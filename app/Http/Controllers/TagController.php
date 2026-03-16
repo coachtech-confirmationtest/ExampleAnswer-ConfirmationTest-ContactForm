@@ -8,6 +8,11 @@ use App\Models\Tag;
 
 class TagController extends Controller
 {
+    public function edit(Tag $tag)
+    {
+        return view('admin.tags.edit', compact('tag'));
+    }
+
     public function store(StoreTagRequest $request)
     {
         Tag::create($request->validated());

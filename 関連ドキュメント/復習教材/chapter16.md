@@ -1395,6 +1395,27 @@ class TagControllerTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_authenticated_user_can_view_edit_page(): void
+    {
+        $user = User::factory()->create();
+        $tag = Tag::factory()->create(['name' => 'test-tag']);
+
+        $response = $this->actingAs($user)->get('/admin/tags/' . $tag->id . '/edit');
+
+        $response->assertStatus(200);
+        $response->assertViewIs('admin.tags.edit');
+        $response->assertSee('test-tag');
+    }
+
+    public function test_unauthenticated_user_cannot_view_edit_page(): void
+    {
+        $tag = Tag::factory()->create();
+
+        $response = $this->get('/admin/tags/' . $tag->id . '/edit');
+
+        $response->assertRedirect('/login');
+    }
+
     public function test_authenticated_user_can_create_tag(): void
     {
         $user = User::factory()->create();
@@ -1437,6 +1458,11 @@ class TagControllerTest extends TestCase
 ```
 
 #### コード解説
+- `test_authenticated_user_can_view_edit_page()`: 認証済みのユーザーがタグ編集ページにアクセスできることをテストします。
+  - `$this->actingAs($user)->get('/admin/tags/' . $tag->id . '/edit')`: ログイン状態でGETリクエストを送信し、編集ページを表示します。
+  - `$response->assertViewIs('admin.tags.edit')`: 正しいビューが返されることを確認します。
+  - `$response->assertSee('test-tag')`: 編集対象のタグ名がページに表示されていることを確認します。
+- `test_unauthenticated_user_cannot_view_edit_page()`: 未認証のユーザーがタグ編集ページにアクセスしようとした場合、ログインページにリダイレクトされることをテストします。
 - `test_authenticated_user_can_create_tag()`: 認証済みのユーザーがタグを作成できることをテストします。
   - `$this->actingAs($user)->post('/admin/tags', ['name' => 'priority'])`: ログイン状態でPOSTリクエストを送信し、タグを作成します。
   - `$response->assertRedirect('/admin')`: 作成後に管理画面にリダイレクトされることを確認します。
@@ -1939,12 +1965,14 @@ sail artisan test
    ✓ contact thanks page is accessible
 
    PASS  Tests\Feature\TagControllerTest
+   ✓ authenticated user can view edit page
+   ✓ unauthenticated user cannot view edit page
    ✓ authenticated user can create tag
    ✓ authenticated user can update tag
    ✓ authenticated user can delete tag
    ✓ unauthenticated user cannot create tag
 
-  Tests:  68 passed
+  Tests:  70 passed
   Time:   2.50s
 ```
 

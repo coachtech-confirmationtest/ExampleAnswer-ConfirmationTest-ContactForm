@@ -11,6 +11,27 @@ class TagControllerTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_authenticated_user_can_view_edit_page(): void
+    {
+        $user = User::factory()->create();
+        $tag = Tag::factory()->create(['name' => 'test-tag']);
+
+        $response = $this->actingAs($user)->get('/admin/tags/'.$tag->id.'/edit');
+
+        $response->assertStatus(200);
+        $response->assertViewIs('admin.tags.edit');
+        $response->assertSee('test-tag');
+    }
+
+    public function test_unauthenticated_user_cannot_view_edit_page(): void
+    {
+        $tag = Tag::factory()->create();
+
+        $response = $this->get('/admin/tags/'.$tag->id.'/edit');
+
+        $response->assertRedirect('/login');
+    }
+
     public function test_authenticated_user_can_create_tag(): void
     {
         $user = User::factory()->create();

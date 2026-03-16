@@ -62,12 +62,11 @@
                             エクスポート
                         </a>
                     </div>
+                    <!-- ページネーション -->
+                    <div class="flex items-center">
+                        {{ $contacts->appends(request()->query())->links() }}
+                    </div>
                 </form>
-            </div>
-
-            <!-- ページネーション -->
-            <div class="mb-4 flex justify-end items-center">
-                {{ $contacts->appends(request()->query())->links() }}
             </div>
 
             <!-- テーブル -->
@@ -153,21 +152,13 @@
                             @forelse ($tags as $tag)
                                 <tr class="border-b border-gray-100">
                                     <td class="px-6 py-3 text-sm text-gray-700">
-                                        <form action="/admin/tags/{{ $tag->id }}" method="post" class="flex items-center gap-2">
-                                            @csrf
-                                            @method('PUT')
-                                            <input type="text" name="name" value="{{ $tag->name }}"
-                                                class="px-3 py-1 bg-white border border-[#ddd8d3] rounded text-gray-700 focus:outline-none focus:border-amber-500" />
-                                            <button type="submit"
-                                                class="px-3 py-1 text-xs bg-[#7d7470] text-white rounded hover:bg-[#6b5f57]">
-                                                更新
-                                            </button>
-                                        </form>
-                                        @error('name')
-                                            <div class="mt-1 text-sm text-red-600">{{ $message }}</div>
-                                        @enderror
+                                        {{ $tag->name }}
                                     </td>
                                     <td class="px-6 py-3 text-sm text-right">
+                                        <a href="/admin/tags/{{ $tag->id }}/edit"
+                                            class="px-3 py-1 text-xs bg-[#7d7470] text-white rounded hover:bg-[#6b5f57] inline-block">
+                                            編集
+                                        </a>
                                         <form action="/admin/tags/{{ $tag->id }}" method="post" class="inline">
                                             @csrf
                                             @method('DELETE')
