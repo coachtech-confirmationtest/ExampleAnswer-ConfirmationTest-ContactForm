@@ -31,11 +31,11 @@
 | Laravel単体 | 削除機能において、確認後に DELETE /admin/contacts/{id} が実行されるか。 | 1 | FALSE | 0 |
 | Laravel単体 | 削除機能において、削除後に /admin へリダイレクトされるか。 | 1 | FALSE | 0 |
 | Laravel単体 | 削除機能において、削除後に一覧から該当行が消えるか。 | 1 | FALSE | 0 |
-| Laravel単体 | CSVダウンロード機能において、エクスポート実行時に /contacts/export が指定条件で呼ばれるか。 | 1 | FALSE | 0 |
-| Laravel単体 | CSVダウンロード機能において、CSVがダウンロードされるか。 | 1 | FALSE | 0 |
-| Laravel単体 | CSVダウンロード機能において、ダウンロードしたCSVの列順が仕様どおりか。 | 1 | FALSE | 0 |
-| Laravel単体 | CSVダウンロード機能において、ダウンロードしたCSVの値が仕様どおりか。 | 1 | FALSE | 0 |
-| Laravel単体 | CSVエクスポート機能において、ダウンロードされたCSVファイルにBOMが付与され、日本語が文字化けしないようになっているか。 | 1 | FALSE | 0 |
+| Laravel単体 | CSVダウンロード機能において、エクスポート実行時に /contacts/export が指定条件で呼ばれるか。（応用） | 1 | FALSE | 0 |
+| Laravel単体 | CSVダウンロード機能において、CSVがダウンロードされるか。（応用） | 1 | FALSE | 0 |
+| Laravel単体 | CSVダウンロード機能において、ダウンロードしたCSVの列順が仕様どおりか。（応用） | 1 | FALSE | 0 |
+| Laravel単体 | CSVダウンロード機能において、ダウンロードしたCSVの値が仕様どおりか。（応用） | 1 | FALSE | 0 |
+| Laravel単体 | CSVエクスポート機能において、ダウンロードされたCSVファイルにBOMが付与され、日本語が文字化けしないようになっているか。（応用） | 1 | FALSE | 0 |
 | Laravel単体 | タグ登録機能において、タグ名を追加した際に一覧へ即時反映されるか。 | 1 | FALSE | 0 |
 | Laravel単体 | タグ更新機能において、編集したタグ名が一覧へ反映されるか。 | 1 | FALSE | 0 |
 | Laravel単体 | タグ更新機能において、重複名で更新した際にエラーメッセージが表示されるか。 | 1 | FALSE | 0 |
@@ -69,11 +69,11 @@
 | マイグレーション | contactsテーブルにおいて、実DBの SHOW CREATE TABLE contacts で外部キーや制約がマイグレーションと一致しているか。 | 1 | FALSE | 0 |
 | マイグレーション | tagsテーブルにおいて、name が VARCHAR(50) で UNIQUE 制約があるか。 | 1 | FALSE | 0 |
 | マイグレーション | tagsテーブルにおいて、timestamps が存在するか。 | 1 | FALSE | 0 |
-| マイグレーション | tagsテーブルにおいて、マイグレーション (2026_02_10_042329_create_tags_table.php) と一致しているか。 | 1 | FALSE | 0 |
+| マイグレーション | tagsテーブルにおいて、マイグレーション (2026_02_10_040044_create_tags_table.php) と一致しているか。 | 1 | FALSE | 0 |
 | マイグレーション | contact_tagテーブル（中間テーブル）において、contact_id と tag_id が BIGINT で、それぞれ contacts / tags を参照し ON DELETE CASCADE になっているか。 | 1 | FALSE | 0 |
 | マイグレーション | contact_tagテーブル（中間テーブル）において、unique(['contact_id','tag_id']) が設定され、同じ組み合わせが重複登録されないようになっているか。 | 1 | FALSE | 0 |
 | マイグレーション | contact_tagテーブル（中間テーブル）において、timestamps があるか。 | 1 | FALSE | 0 |
-| マイグレーション | contact_tagテーブル（中間テーブル）において、実DBとマイグレーション (2026_02_10_042338_create_contact_tag_table.php) が一致しているか。 | 1 | FALSE | 0 |
+| マイグレーション | contact_tagテーブル（中間テーブル）において、実DBとマイグレーション (2026_02_10_040045_create_contact_tag_table.php) が一致しているか。 | 1 | FALSE | 0 |
 | マイグレーション | すべての FK (contacts.category_id, contact_tag.contact_id, contact_tag.tag_id) が想定どおり設定されているか。 | 1 | FALSE | 0 |
 | マイグレーション | 実際にカテゴリやタグを削除した際、関連レコードが自動で削除される（cascadeが有効）かを確認。 | 1 | FALSE | 0 |
 | マイグレーション | email (users) や name (tags) など UNIQUE 制約が必要な列に適切な index が付いているか。 | 1 | FALSE | 0 |
@@ -84,31 +84,31 @@
 | バリデーション | お問い合わせ送信画面にて、POST /contacts でも同一の StoreContactRequest によるバリデーションが適用されていること | 1 | FALSE | 0 |
 | バリデーション | お問い合わせ送信（タグ・検索条件）にて、以下のルールでバリデーションができていること tag_ids[]: array / integer / exists:tags,id、keyword: nullable / string / max:255、gender: nullable / integer / in:0,1,2,3、category_id: nullable / integer / exists:categories,id、date: nullable / date | 1 | FALSE | 0 |
 | バリデーション | タグマスタ管理画面にて、以下のルールでフォームリクエストを用いたバリデーションができていること name: 必須 / string / max:50 / unique | 1 | FALSE | 0 |
-| バリデーション | CSVエクスポートにて、以下のルールでフォームリクエストを用いたバリデーションができていること keyword: nullable / string / max:255、gender: nullable / integer / in:0,1,2,3、category_id: nullable / integer / exists:categories,id、date: nullable / date | 1 | FALSE | 0 |
+| バリデーション | CSVエクスポートにて、以下のルールでフォームリクエストを用いたバリデーションができていること keyword: nullable / string / max:255、gender: nullable / integer / in:0,1,2,3、category_id: nullable / integer / exists:categories,id、date: nullable / date（応用） | 1 | FALSE | 0 |
 | バリデーション | 管理ユーザー登録画面にて、以下のルールでバリデーションができていること name: 必須 / string / max:255、email: 必須 / email / max:255 / unique、password: Fortify標準（8文字以上・確認用一致） | 1 | FALSE | 0 |
 | バリデーション | ログイン画面にて、以下のルールでバリデーションができていること email: 必須 / email / max:255、password: 必須 | 1 | FALSE | 0 |
-| バリデーション | お問い合わせ一覧APIにて、以下のルールでフォームリクエストを用いたバリデーションができていること keyword: nullable / string / max:255、gender: nullable / integer / in:1,2,3、category_id: nullable / integer / exists:categories,id、date: nullable / date、per_page: nullable / integer / min:1 / max:100 | 1 | FALSE | 0 |
-| バリデーション | お問い合わせ作成・更新APIにて、Web版と同一ルール（first_name〜detail + tag_ids[]）でフォームリクエストを用いたバリデーションができていること | 1 | FALSE | 0 |
-| API | GET /api/v1/contacts にて、正常系でリクエストを送信すると HTTP 200 が返り、JSON の data 配列と meta 情報（current_page, last_page, per_page, total）が含まれるか確認。 | 1 | FALSE | 0 |
-| API | GET /api/v1/contacts にて、keyword 検索パラメータで正しくフィルタリングされるか確認。 | 1 | FALSE | 0 |
-| API | GET /api/v1/contacts にて、gender フィルタで正しくフィルタリングされるか確認。 | 1 | FALSE | 0 |
-| API | GET /api/v1/contacts にて、category_id フィルタで正しくフィルタリングされるか確認。 | 1 | FALSE | 0 |
-| API | GET /api/v1/contacts にて、date フィルタで正しくフィルタリングされるか確認。 | 1 | FALSE | 0 |
-| API | GET /api/v1/contacts にて、gender=9 のような不正値で 422 が返り、バリデーションエラーが返るか確認。 | 1 | FALSE | 0 |
-| API | GET /api/v1/contacts にて、十分な件数を用意し per_page や page パラメータでページング結果が正しいか確認。 | 1 | FALSE | 0 |
-| API | GET /api/v1/contacts/{id} にて、存在する ID を指定して 200 が返り、data 内にカテゴリ・タグ付きの ContactResource が返るか確認。 | 1 | FALSE | 0 |
-| API | GET /api/v1/contacts/{id} にて、存在しない ID を指定すると 404 とエラーメッセージ JSON が返るか確認。 | 1 | FALSE | 0 |
-| API | POST /api/v1/contacts にて、正常 payload でリクエストし 201 が返り、contacts と contact_tag にレコードが追加されるか確認。 | 1 | FALSE | 0 |
-| API | POST /api/v1/contacts にて、tag_ids を省略または空配列で送信しても 201 が返り、contact_tag にレコードが入らないことを確認。 | 1 | FALSE | 0 |
-| API | POST /api/v1/contacts にて、不正データ（tel 9桁等）で送信すると 422 とバリデーションエラーが返るか確認。 | 1 | FALSE | 0 |
-| API | PUT /api/v1/contacts/{id} にて、正常 payload で 200 が返り、更新内容がレスポンスに反映されるか確認。 | 1 | FALSE | 0 |
-| API | PUT /api/v1/contacts/{id} にて、存在しない ID を指定すると 404 が返るか確認。 | 1 | FALSE | 0 |
-| API | PUT /api/v1/contacts/{id} にて、不正データで送信すると 422 とバリデーションエラーが返るか確認。 | 1 | FALSE | 0 |
-| API | DELETE /api/v1/contacts/{id} にて、既存 ID でリクエストして 204 が返り、contacts の該当レコードが削除されるか確認。 | 1 | FALSE | 0 |
-| API | DELETE /api/v1/contacts/{id} にて、存在しない ID を指定して 404 が返るか確認。 | 1 | FALSE | 0 |
-| API | API用コントローラーがWeb用と分離されているか（Api\V1名前空間）。 | 1 | FALSE | 0 |
-| API | API Resources（ContactResource）によるJSON整形が使用されているか。 | 1 | FALSE | 0 |
-| API | API用のFormRequest（Api\V1名前空間）でバリデーションが実装されているか。 | 1 | FALSE | 0 |
+| バリデーション | お問い合わせ一覧APIにて、以下のルールでフォームリクエストを用いたバリデーションができていること keyword: nullable / string / max:255、gender: nullable / integer / in:1,2,3、category_id: nullable / integer / exists:categories,id、date: nullable / date、per_page: nullable / integer / min:1 / max:100（応用） | 1 | FALSE | 0 |
+| バリデーション | お問い合わせ作成・更新APIにて、Web版と同一ルール（first_name〜detail + tag_ids[]）でフォームリクエストを用いたバリデーションができていること（応用） | 1 | FALSE | 0 |
+| API | GET /api/v1/contacts にて、正常系でリクエストを送信すると HTTP 200 が返り、JSON の data 配列と meta 情報（current_page, last_page, per_page, total）が含まれるか確認。（応用） | 1 | FALSE | 0 |
+| API | GET /api/v1/contacts にて、keyword 検索パラメータで正しくフィルタリングされるか確認。（応用） | 1 | FALSE | 0 |
+| API | GET /api/v1/contacts にて、gender フィルタで正しくフィルタリングされるか確認。（応用） | 1 | FALSE | 0 |
+| API | GET /api/v1/contacts にて、category_id フィルタで正しくフィルタリングされるか確認。（応用） | 1 | FALSE | 0 |
+| API | GET /api/v1/contacts にて、date フィルタで正しくフィルタリングされるか確認。（応用） | 1 | FALSE | 0 |
+| API | GET /api/v1/contacts にて、gender=9 のような不正値で 422 が返り、バリデーションエラーが返るか確認。（応用） | 1 | FALSE | 0 |
+| API | GET /api/v1/contacts にて、十分な件数を用意し per_page や page パラメータでページング結果が正しいか確認。（応用） | 1 | FALSE | 0 |
+| API | GET /api/v1/contacts/{id} にて、存在する ID を指定して 200 が返り、data 内にカテゴリ・タグ付きの ContactResource が返るか確認。（応用） | 1 | FALSE | 0 |
+| API | GET /api/v1/contacts/{id} にて、存在しない ID を指定すると 404 とエラーメッセージ JSON が返るか確認。（応用） | 1 | FALSE | 0 |
+| API | POST /api/v1/contacts にて、正常 payload でリクエストし 201 が返り、contacts と contact_tag にレコードが追加されるか確認。（応用） | 1 | FALSE | 0 |
+| API | POST /api/v1/contacts にて、tag_ids を省略または空配列で送信しても 201 が返り、contact_tag にレコードが入らないことを確認。（応用） | 1 | FALSE | 0 |
+| API | POST /api/v1/contacts にて、不正データ（tel 9桁等）で送信すると 422 とバリデーションエラーが返るか確認。（応用） | 1 | FALSE | 0 |
+| API | PUT /api/v1/contacts/{id} にて、正常 payload で 200 が返り、更新内容がレスポンスに反映されるか確認。（応用） | 1 | FALSE | 0 |
+| API | PUT /api/v1/contacts/{id} にて、存在しない ID を指定すると 404 が返るか確認。（応用） | 1 | FALSE | 0 |
+| API | PUT /api/v1/contacts/{id} にて、不正データで送信すると 422 とバリデーションエラーが返るか確認。（応用） | 1 | FALSE | 0 |
+| API | DELETE /api/v1/contacts/{id} にて、既存 ID でリクエストして 204 が返り、contacts の該当レコードが削除されるか確認。（応用） | 1 | FALSE | 0 |
+| API | DELETE /api/v1/contacts/{id} にて、存在しない ID を指定して 404 が返るか確認。（応用） | 1 | FALSE | 0 |
+| API | API用コントローラーがWeb用と分離されているか（Api\V1名前空間）。（応用） | 1 | FALSE | 0 |
+| API | API Resources（ContactResource）によるJSON整形が使用されているか。（応用） | 1 | FALSE | 0 |
+| API | API用のFormRequest（Api\V1名前空間）でバリデーションが実装されているか。（応用） | 1 | FALSE | 0 |
 | シーディング | 要件の指示に従って、Userテーブルのダミーデータとして要件で指示されたユーザーを作成することができているか | 1 | FALSE | 0 |
 | シーディング | 要件の指示に従って、categoryテーブルのダミーデータ 5件を作成できているか | 1 | FALSE | 0 |
 | シーディング | 要件の指示に従って、Tagテーブルのダミーデータを5件作成できているか | 1 | FALSE | 0 |
@@ -119,7 +119,7 @@
 | マイグレーション | テーブル仕様に従った usersテーブルのマイグレーションファイルを作成できているか | 1 | FALSE | 0 |
 | マイグレーション | テーブル仕様に従った tagsテーブルのマイグレーションファイルを作成できているか | 1 | FALSE | 0 |
 | マイグレーション | php artisan migrate を実行し 各テーブルが作成できるか | 1 | FALSE | 0 |
-| テスト | CSVエクスポートのバリデーション要件において、正しいフィルタ条件を受け付け、不正な性別や存在しないカテゴリIDを拒否することを検証する Unit Tests が実装されパスしているか。 | 1 | FALSE | 0 |
+| テスト | CSVエクスポートのバリデーション要件において、正しいフィルタ条件を受け付け、不正な性別や存在しないカテゴリIDを拒否することを検証する Unit Tests が実装されパスしているか。（応用） | 1 | FALSE | 0 |
 | テスト | お問い合わせ一覧検索のバリデーションにおいて、キーワード・性別・カテゴリ・日付フィルタが有効であり、不正な性別値を拒否することを検証する Unit Tests が実装されパスしているか。 | 1 | FALSE | 0 |
 | テスト | お問い合わせ保存のバリデーションにおいて、全ての必須項目とタグ入力を受け付け、不正な電話番号形式を拒否することを検証する Unit Tests が実装されパスしているか。 | 1 | FALSE | 0 |
 | テスト | タグ新規登録のバリデーションにおいて、タグ名の必須入力、文字数制限、一意性（重複禁止）が維持されていることを検証する Unit Tests が実装されパスしているか。 | 1 | FALSE | 0 |
@@ -135,14 +135,14 @@
 | テスト | お問い合わせ削除（AdminControllerTest）において、DELETE /admin/contacts/{id} でレコードが削除され /admin へリダイレクトされることを検証する Feature Tests が実装されパスしているか。 | 1 | FALSE | 0 |
 | テスト | タグ管理（TagControllerTest）において、認証ユーザーによるタグの作成・更新・削除が /admin へリダイレクト付きで行え、未認証時は /login へリダイレクトされることを検証する Feature Tests が実装されパスしているか。 | 1 | FALSE | 0 |
 | テスト | ユーザー向け画面表示（ContactPageTest）において、/ でカテゴリ・タグがサーバーサイド描画され、/thanks が正常に表示されることを検証する Feature Tests が実装されパスしているか。 | 1 | FALSE | 0 |
-| テスト | CSVダウンロードのエクスポート機能において、ログイン済み管理者がフィルタ条件付きでCSVをDLでき、無指定時は新着順で出力されることを検証する Feature Tests が実装されパスしているか。 | 1 | FALSE | 0 |
-| テスト | API検索バリデーション（Api\V1\IndexContactRequest）において、有効なフィルタの受付と不正な性別値(0含む)・per_page超過を拒否することを検証する Unit Tests が実装されパスしているか。 | 1 | FALSE | 0 |
-| テスト | API作成バリデーション（Api\V1\StoreContactRequest）において、全必須項目・タグの受付と不正な値の拒否を検証する Unit Tests が実装されパスしているか。 | 1 | FALSE | 0 |
-| テスト | お問い合わせ一覧API（GET /api/v1/contacts）において、JSON一覧取得・検索・ページネーション・バリデーションエラーを検証する Feature Tests が実装されパスしているか。 | 1 | FALSE | 0 |
-| テスト | お問い合わせ詳細API（GET /api/v1/contacts/{id}）において、詳細取得と404エラーを検証する Feature Tests が実装されパスしているか。 | 1 | FALSE | 0 |
-| テスト | お問い合わせ作成API（POST /api/v1/contacts）において、201レスポンス・DB保存・バリデーションエラーを検証する Feature Tests が実装されパスしているか。 | 1 | FALSE | 0 |
-| テスト | お問い合わせ更新API（PUT /api/v1/contacts/{id}）において、200レスポンス・更新反映・404エラーを検証する Feature Tests が実装されパスしているか。 | 1 | FALSE | 0 |
-| テスト | お問い合わせ削除API（DELETE /api/v1/contacts/{id}）において、204レスポンス・レコード削除・404エラーを検証する Feature Tests が実装されパスしているか。 | 1 | FALSE | 0 |
+| テスト | CSVダウンロードのエクスポート機能において、ログイン済み管理者がフィルタ条件付きでCSVをDLでき、無指定時は新着順で出力されることを検証する Feature Tests が実装されパスしているか。（応用） | 1 | FALSE | 0 |
+| テスト | API検索バリデーション（Api\V1\IndexContactRequest）において、有効なフィルタの受付と不正な性別値(0含む)・per_page超過を拒否することを検証する Unit Tests が実装されパスしているか。（応用） | 1 | FALSE | 0 |
+| テスト | API作成バリデーション（Api\V1\StoreContactRequest）において、全必須項目・タグの受付と不正な値の拒否を検証する Unit Tests が実装されパスしているか。（応用） | 1 | FALSE | 0 |
+| テスト | お問い合わせ一覧API（GET /api/v1/contacts）において、JSON一覧取得・検索・ページネーション・バリデーションエラーを検証する Feature Tests が実装されパスしているか。（応用） | 1 | FALSE | 0 |
+| テスト | お問い合わせ詳細API（GET /api/v1/contacts/{id}）において、詳細取得と404エラーを検証する Feature Tests が実装されパスしているか。（応用） | 1 | FALSE | 0 |
+| テスト | お問い合わせ作成API（POST /api/v1/contacts）において、201レスポンス・DB保存・バリデーションエラーを検証する Feature Tests が実装されパスしているか。（応用） | 1 | FALSE | 0 |
+| テスト | お問い合わせ更新API（PUT /api/v1/contacts/{id}）において、200レスポンス・更新反映・404エラーを検証する Feature Tests が実装されパスしているか。（応用） | 1 | FALSE | 0 |
+| テスト | お問い合わせ削除API（DELETE /api/v1/contacts/{id}）において、204レスポンス・レコード削除・404エラーを検証する Feature Tests が実装されパスしているか。（応用） | 1 | FALSE | 0 |
 | コード品質 | お問い合わせ一覧取得において、Eager Loading（withメソッド等）を使用して、カテゴリ取得によるN+1問題が防止されているか。 | 1 | FALSE | 0 |
 | コード品質 | 変数名などに、a,xなどの意味のない命名をしない | 1 | FALSE | 0 |
 | コード品質 | 変数名などに、ローマ字などの英単語ではないもので命名をしない | 1 | FALSE | 0 |
