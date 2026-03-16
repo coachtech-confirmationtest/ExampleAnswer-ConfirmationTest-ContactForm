@@ -98,13 +98,13 @@ erDiagram
     cp .env.example .env
     ```
 
-    `.env` ファイル内の以下のDB接続情報を確認・設定します。デフォルトではLaravel Sailの標準設定になっています。
+    `.env` ファイル内の以下のDB接続情報を確認・設定します。`.env.example` のデフォルト値はSail向けではないため、以下のように変更してください。
 
     ```ini
     DB_CONNECTION=mysql
     DB_HOST=mysql
     DB_PORT=3306
-    DB_DATABASE=contact-form-app
+    DB_DATABASE=laravel
     DB_USERNAME=sail
     DB_PASSWORD=password
     ```
