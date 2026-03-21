@@ -37,6 +37,7 @@
 | | ER図 | 自分で設計したER図の画像またはMermaid記法でのテキスト。カーディナリティ（1対多、多対多などの関連の数量関係）が正しく記述されていること | |
 | | 環境構築手順 | 上記「初期設定手順」を参考に、誰でも環境構築ができるように詳細に記載 | |
 | | 使用技術 | Laravel 10, MySQL 8.0, Nginx, Dockerなど、使用した技術スタック一覧 | |
+| | APIエンドポイント一覧 | 実装したAPIのエンドポイント一覧（メソッド・パス・概要） | |
 | | 作成者 | 自分の名前 | |
 | コード品質担保のための指示 | 命名規則 | ・Laravelの標準命名規則（PSR-12準拠）に従うこと<br> - 変数/メソッド: `camelCase`<br> - クラス: `PascalCase`<br> - DBテーブル: `snake_case`（複数形）<br> - DBカラム: `snake_case`（単数形）<br> - モデル名：アッパーキャメル<br> - コントローラー名：アッパーキャメル<br> - フォームリクエスト名：アッパーキャメル<br> - マイグレーションファイル名：スネークケース<br> - シーディングファイル名：アッパーキャメル<br>・変数名やメソッド名に `a`, `x` など意味のない命名をしないこと<br>・ローマ字（例: `okyakusama`）など英単語ではないもので命名しないこと | |
 | | コードフォーマット | ・Laravel Pintを使用してコードを自動整形すること<br>・コミット前に `vendor/bin/pint` または `sail bin pint` を実行し、整形されたコードをコミットする<br>・採点基準: `sail bin pint --test` を実行し「No fixable issues were found」と表示されること | |
@@ -79,14 +80,14 @@
 
 | 画面ID | 画面名称 | HTTPメソッド | パス | 備考 |
 |--------|---------|-------------|------|------|
-| PG01 | お問い合わせフォーム | GET | / | Blade提供済み。<br>公開トップ画面。二段構成フォームと入力欄（氏名・性別・メール・電話・住所・建物名・カテゴリ・タグ・内容）を表示し、カテゴリ／タグ候補はコントローラーからBlade変数として渡す。<br>routes/web.php<br>app/Http/Controllers/ContactController@index<br>resources/views/contact/index.blade.php |
-| PG02 | 入力内容確認画面 | POST | /contacts/confirm | Blade提供済み。<br>POST /contacts/confirm でStoreContactRequestによるバリデーション後、確認ページ（contact.confirm）へ遷移する。確認画面にはカテゴリ名・タグ名を含む入力内容を表示し、再編集（戻る）や送信を制御する。<br>routes/web.php<br>app/Http/Controllers/ContactController@confirm<br>resources/views/contact/confirm.blade.php |
-| PG03 | お問い合わせ完了 | GET | /thanks | Blade提供済み。<br>送信完了メッセージとHOMEリンクのみを表示。<br>routes/web.php<br>app/Http/Controllers/ContactController@thanks<br>resources/views/contact/thanks.blade.php |
+| PG01 | お問い合わせフォーム入力ページ | GET | / | Blade提供済み。<br>公開トップ画面。二段構成フォームと入力欄（氏名・性別・メール・電話・住所・建物名・カテゴリ・タグ・内容）を表示し、カテゴリ／タグ候補はコントローラーからBlade変数として渡す。<br>routes/web.php<br>app/Http/Controllers/ContactController@index<br>resources/views/contact/index.blade.php |
+| PG02 | お問い合わせフォーム確認ページ | POST | /contacts/confirm | Blade提供済み。<br>POST /contacts/confirm でStoreContactRequestによるバリデーション後、確認ページ（contact.confirm）へ遷移する。確認画面にはカテゴリ名・タグ名を含む入力内容を表示し、再編集（戻る）や送信を制御する。<br>routes/web.php<br>app/Http/Controllers/ContactController@confirm<br>resources/views/contact/confirm.blade.php |
+| PG03 | サンクスページ | GET | /thanks | Blade提供済み。<br>送信完了メッセージとHOMEリンクのみを表示。<br>routes/web.php<br>app/Http/Controllers/ContactController@thanks<br>resources/views/contact/thanks.blade.php |
 | PG05 | 管理画面 | GET | /admin | Blade提供済み。<br>認証必須。検索条件フォーム、ページネーション（検索バー右横に配置）、結果テーブル、CSVエクスポートボタン、タグ管理セクションで構成。<br>routes/web.php<br>app/Http/Controllers/AdminController@index<br>resources/views/admin/index.blade.php |
-| PG05-2 | お問い合わせ詳細 | GET | /admin/contacts/{contact} | Blade提供済み。<br>認証必須。指定されたお問い合わせの詳細情報（カテゴリ・タグ含む）を表示する詳細ページ。<br>routes/web.php<br>app/Http/Controllers/AdminController@show<br>resources/views/admin/show.blade.php |
+| PG05-2 | お問い合わせ詳細ページ | GET | /admin/contacts/{contact} | Blade提供済み。<br>認証必須。指定されたお問い合わせの詳細情報（カテゴリ・タグ含む）を表示する詳細ページ。<br>routes/web.php<br>app/Http/Controllers/AdminController@show<br>resources/views/admin/show.blade.php |
 | PG05-3 | タグ編集ページ | GET | /admin/tags/{tag}/edit | 認証必須。指定されたタグの編集フォームを表示するページ。PUT送信でタグ名を更新し、`/admin`にリダイレクトする。<br>routes/web.php<br>app/Http/Controllers/TagController@edit<br>resources/views/admin/tags/edit.blade.php |
-| PG05 | 管理者ログイン | GET | /login | Blade提供済み。<br>Fortifyが提供するログインビュー。メール・パスワード入力と送信のみ。<br>app/Providers/FortifyServiceProvider<br>resources/views/auth/login.blade.php |
-| PG06 | 管理者登録 | GET | /register | Blade提供済み。<br>Fortifyが提供する登録ビュー。氏名・メール・パスワードを登録。<br>app/Providers/FortifyServiceProvider<br>resources/views/auth/register.blade.php |
+| PG05 | ログイン画面 | GET | /login | Blade提供済み。<br>Fortifyが提供するログインビュー。メール・パスワード入力と送信のみ。<br>app/Providers/FortifyServiceProvider<br>resources/views/auth/login.blade.php |
+| PG06 | 管理者登録画面 | GET | /register | Blade提供済み。<br>Fortifyが提供する登録ビュー。氏名・メール・パスワードを登録。<br>app/Providers/FortifyServiceProvider<br>resources/views/auth/register.blade.php |
 
 ### Bladeファイルの提供
 
@@ -116,7 +117,7 @@ Bladeは提供済みのため、バックエンドの実装に集中してくだ
 | No. | EPIC名 | 機能ID. | 機能名 | 概要（ビジネスロジック） | 入力条件/制約 | 期待結果 | バックエンド挙動 | 関連ソース/責務 | 基本/応用 |
 |-----|--------|---------|--------|------------------------|-------------|---------|----------------|---------------|---------|
 | 1 | お問い合わせ受付（ユーザー向け） | WF01 | フォーム表示・初期入力 | ユーザーが / で問い合わせフォーム全項目を閲覧し、入力を開始できる。 | - URL: GET /<br>- 認証: 不要 | 画面がエラーなく表示され、カテゴリ・タグが選択肢として表示される。 | - / ルートで contact.index を返す。<br>- コントローラーで Category::all() と Tag::all() を取得し、Blade変数として渡す。<br>- CSRF/metaタグをBladeに埋め込む。 | - routes/web.php<br>- app/Http/Controllers/ContactController@index<br>- resources/views/contact/index.blade.php | 基本 |
-| | | WF02 | 入力内容確認 | 入力値をサーバーサイドでバリデーション後、確認画面に表示する。カテゴリ・タグ名称を含めて表示する。 | - URL: POST /contacts/confirm<br>- 認証: 不要 | 確認画面（contact.confirm）で名称付きの値を確認し、修正に戻れる。 | - POST /contacts/confirm でStoreContactRequestによるバリデーションを実行。<br>- バリデーション通過時にCategory/Tagの名称を取得し、確認ビューを描画。<br>- バリデーション失敗時はエラー付きでリダイレクト。 | - routes/web.php<br>- app/Http/Controllers/ContactController@confirm<br>- app/Http/Requests/StoreContactRequest<br>- resources/views/contact/confirm.blade.php | 基本 |
+| | | WF02 | 入力内容確認 | 入力値をサーバーサイドでバリデーション後、お問い合わせフォーム確認ページに表示する。カテゴリ・タグ名称を含めて表示する。 | - URL: POST /contacts/confirm<br>- 認証: 不要 | 確認画面（contact.confirm）で名称付きの値を確認し、修正に戻れる。 | - POST /contacts/confirm でStoreContactRequestによるバリデーションを実行。<br>- バリデーション通過時にCategory/Tagの名称を取得し、確認ビューを描画。<br>- バリデーション失敗時はエラー付きでリダイレクト。 | - routes/web.php<br>- app/Http/Controllers/ContactController@confirm<br>- app/Http/Requests/StoreContactRequest<br>- resources/views/contact/confirm.blade.php | 基本 |
 | | | WF04 | お問い合わせ送信 | ユーザーが入力内容を送信し、問い合わせと任意タグを登録できる。 | - URL: POST /contacts<br>- 認証: 不要<br>- バリデーション: StoreContactRequest | 成功時 /thanks へリダイレクトし、失敗時はエラー表示 | - POST /contacts でフォームデータを受領。<br>- バリデーション通過時に contacts と contact_tag を作成。<br>- 成功時は redirect('/thanks')。 | - routes/web.php<br>- app/Http/Controllers/ContactController@store<br>- app/Models/Contact, Tag | 基本 |
 | | | WF05 | 完了画面表示 | 送信後に完了メッセージを提示し、HOMEへ戻す導線を提供する。 | - URL: GET /thanks<br>- 認証: 不要 | メッセージとHOMEリンクが表示される。 | - /thanks ルートで contact.thanks を返す。 | - routes/web.php<br>- app/Http/Controllers/ContactController@thanks | 基本 |
 | 2 | 問い合わせ運用（管理者向け） | WF06 | お問い合わせ一覧・検索 | 管理者が認証後の画面で条件検索し、7件ごとの一覧とページ切り替えができる。 | - URL: GET /admin（要ログイン）<br>- クエリ: keyword/gender/category_id/date/page | 検索条件に合致する結果が7件ごとにページネーションされ、Bladeで描画される。 | - /admin は auth ミドルウェアで保護。<br>- IndexContactRequest で入力検証。<br>- Contact::with(['category','tags'])->paginate(7) でページネーション。<br>- categories, tags もBlade変数として渡す。 | - routes/web.php<br>- app/Http/Controllers/AdminController@index<br>- app/Http/Requests/IndexContactRequest<br>- resources/views/admin/index.blade.php | 基本 |
@@ -446,11 +447,12 @@ AP03と同一のリクエストボディ。パスパラメータとして `conta
 | | gender | nullable / integer / in:0,1,2,3 | 応用 |
 | | category_id | nullable / integer / exists:categories,id | 応用 |
 | | date | nullable / date | 応用 |
-| お問い合わせ一覧API | keyword | nullable / string / max:255 | 応用 |
+| お問い合わせ検索・一覧API | keyword | nullable / string / max:255 | 応用 |
 | | gender | nullable / integer / in:1,2,3 | 応用 |
 | | category_id | nullable / integer / exists:categories,id | 応用 |
 | | date | nullable / date | 応用 |
 | | per_page | nullable / integer / min:1 / max:100 | 応用 |
+| | page | nullable / integer / min:1 | 応用 |
 | お問い合わせ作成・更新API | first_name, last_name | 必須 / string / max:255 | 応用 |
 | | gender | 必須 / integer / in:1,2,3 | 応用 |
 | | email | 必須 / string / email / max:255 | 応用 |
@@ -460,7 +462,7 @@ AP03と同一のリクエストボディ。パスパラメータとして `conta
 | | category_id | 必須 / integer / exists:categories,id | 応用 |
 | | detail | 必須 / string / max:120 | 応用 |
 | | tag_ids[] | nullable / array / integer / exists:tags,id | 応用 |
-| 管理ユーザー登録 | name | 必須 / string / max:255 | 基本 |
+| 管理者登録 | name | 必須 / string / max:255 | 基本 |
 | | email | 必須 / email / max:255 / unique | 基本 |
 | | password | Fortify標準（8文字以上・確認用一致） | 基本 |
 | ログイン/ログアウト | email | 必須 / email | 基本 |
@@ -480,7 +482,7 @@ AP03と同一のリクエストボディ。パスパラメータとして `conta
 | CategorySeeder | - categories テーブルに問い合わせ分類を固定で5件投入する。<br>- 固定データ: 「商品のお届けについて」「商品の交換について」「商品トラブル」「ショップへのお問い合わせ」「その他」。 | 基本 |
 | TagSeeder | - tags テーブルにタグ候補を固定で5件投入する。<br>- 固定データ: 「質問」「要望」「不具合報告」「ご意見」「その他」。 | 基本 |
 | ContactSeeder | - Faker (ja_JP) を用いて contacts テーブルに20件のダミーデータを投入する。<br>- カテゴリは既存の categories からランダムに選択し、category_id を付与する。<br>- 入力する項目（first_name/last_name/gender/email/tel/address/building/detail など）は実際のフォーム入力に近い値を生成する。<br>- 各Contactに対して、既存の tags テーブルからランダムに1〜3件のタグを `attach()` で紐付ける（contact_tag 中間テーブルにレコードが作成される）。 | 基本 |
-| DatabaseSeeder | - 上記 Seeder (UserSeeder, CategorySeeder, TagSeeder, ContactSeeder) を DatabaseSeeder の run() で順番に呼び出し、php artisan db:seed でまとめて投入できるようにする。 | 基本 |
+| DatabaseSeeder | - 上記 Seeder (UserSeeder, CategorySeeder, TagSeeder, ContactSeeder) を DatabaseSeeder の run() で順番に呼び出し、sail artisan db:seed でまとめて投入できるようにする。 | 基本 |
 
 ---
 
@@ -507,9 +509,9 @@ AP03と同一のリクエストボディ。パスパラメータとして `conta
 | | モデル | カテゴリ関係 | 1つのカテゴリから、紐づく複数のお問い合わせ（hasMany）が正しく取得できること。 | 基本 |
 | | モデル | お問い合わせ関係 | 1つのお問い合わせが特定のカテゴリに属し、複数のタグと同期（sync）できること。 | 基本 |
 | | モデル | タグ関係 | 中間テーブルを介して、1つのタグが複数のお問い合わせに紐づいていること。 | 基本 |
-| 機能テスト (Feature Tests) | 画面アクセス | ページ表示 | お問い合わせトップ画面（/）が正常に表示され、categories・tagsがビュー変数として渡されること。カテゴリ名・タグ名がページに描画されること。完了画面（/thanks）が正常に表示されること。 | 基本 |
+| 機能テスト (Feature Tests) | 画面アクセス | ページ表示 | お問い合わせフォーム入力ページ（/）が正常に表示され、categories・tagsがビュー変数として渡されること。カテゴリ名・タグ名がページに描画されること。サンクスページ（/thanks）が正常に表示されること。 | 基本 |
 | | 画面アクセス | 管理画面アクセス制御 | 認証されたユーザーのみが管理ダッシュボード（/admin）を表示できること。未認証ユーザーは /login にリダイレクトされること。 | 基本 |
-| | お問い合わせ | 確認画面表示 | POST /contacts/confirm でバリデーション通過時に確認画面（contact.confirm）が表示され、入力内容（氏名・メール・カテゴリ名等）が画面に描画されること。バリデーションエラー時はリダイレクトされエラーが返ること。 | 基本 |
+| | お問い合わせ | お問い合わせフォーム確認ページ表示 | POST /contacts/confirm でバリデーション通過時にお問い合わせフォーム確認ページ（contact.confirm）が表示され、入力内容（氏名・メール・カテゴリ名等）が画面に描画されること。バリデーションエラー時はリダイレクトされエラーが返ること。 | 基本 |
 | | お問い合わせ | お問い合わせ送信 | POST /contacts でバリデーション通過時にcontactsテーブルにレコードが保存され、タグがcontact_tagテーブルに記録され、/thanksへリダイレクトされること。バリデーションエラー時はリダイレクトされエラーが返ること。 | 基本 |
 | | 管理機能 | 検索・ページネーション | GET /admin でキーワード・性別・カテゴリ・日付フィルタが機能し、結果が7件ごとにページネーションされること。 | 基本 |
 | | 管理機能 | お問い合わせ詳細 | GET /admin/contacts/{contact} で指定したお問い合わせがカテゴリ情報付きで詳細ページ（admin.show）に表示されること。 | 基本 |
@@ -704,39 +706,39 @@ erDiagram
 
 | 画面名 | 操作 | URL / メソッド | 完了条件 | 使用技術 | 基本/応用 |
 |--------|------|---------------|---------|---------|---------|
-| **お問い合わせフォーム** | ページを表示する | GET / | 氏名（姓・名）・性別・メール・電話・住所・建物名の入力欄が表示され、カテゴリ・タグが選択肢として表示される | ContactController@index, Category::all(), Tag::all(), contact.index | 基本 |
+| **お問い合わせフォーム入力ページ** | ページを表示する | GET / | 氏名（姓・名）・性別・メール・電話・住所・建物名の入力欄が表示され、カテゴリ・タグが選択肢として表示される | ContactController@index, Category::all(), Tag::all(), contact.index | 基本 |
 | | カテゴリを選択する | （画面内操作） | categoriesテーブルのデータがドロップダウンに表示され、選択できる | Blade変数 $categories | 基本 |
 | | タグを選択する | （画面内操作） | tagsテーブルのデータがチェックボックスに表示され、複数選択できる | Blade変数 $tags | 基本 |
-| | 全項目を入力して「確認画面」ボタンを押す | POST /contacts/confirm | バリデーション通過時→確認画面に遷移する。失敗時→エラーメッセージが各項目下に赤文字で表示される | StoreContactRequest, ContactController@confirm | 基本 |
-| **入力内容確認画面** | 確認画面が表示される | POST /contacts/confirm（結果） | 入力した氏名・性別（文字列で表示）・メール・電話・住所・建物名・カテゴリ名（文字列で表示）・お問い合わせ内容が正しく表示される。タグ選択時はタグ名も文字列で表示される | contact.confirm, Category::find() | 基本 |
+| | 全項目を入力して「確認画面」ボタンを押す | POST /contacts/confirm | バリデーション通過時→お問い合わせフォーム確認ページに遷移する。失敗時→エラーメッセージが各項目下に赤文字で表示される<br>エラーメッセージ:<br>　a. 姓が未入力の場合：姓を入力してください<br>　b. 名が未入力の場合：名を入力してください<br>　c. 性別が未選択の場合：性別を選択してください<br>　d. メールアドレスが未入力の場合：メールアドレスを入力してください<br>　e. メール形式ではない場合：メールアドレスはメール形式で入力してください<br>　f. 電話番号が未入力の場合：電話番号を入力してください<br>　g. 電話番号が不正な場合：電話番号はハイフンなしの10〜11桁で入力してください<br>　h. 住所が未入力の場合：住所を入力してください<br>　i. お問い合わせの種類が未選択の場合：お問い合わせの種類を選択してください<br>　j. お問い合わせ内容が未入力の場合：お問い合わせ内容を入力してください<br>　k. お問い合わせ内容が120文字を超えた場合：お問い合わせ内容は120文字以内で入力してください<br>　l. 性別の値が不正な場合：性別の値が不正です<br>　m. 存在しないカテゴリを選択した場合：選択されたカテゴリーが存在しません<br>　n. 存在しないタグを選択した場合：選択されたタグが存在しません | StoreContactRequest, ContactController@confirm | 基本 |
+| **お問い合わせフォーム確認ページ** | お問い合わせフォーム確認ページが表示される | POST /contacts/confirm（結果） | 入力した氏名・性別（文字列で表示）・メール・電話・住所・建物名・カテゴリ名（文字列で表示）・お問い合わせ内容が正しく表示される。タグ選択時はタグ名も文字列で表示される | contact.confirm, Category::find() | 基本 |
 | | 「送信」ボタンを押す | POST /contacts | contactsテーブルにレコードが保存され、タグがcontact_tagテーブルに記録され、/thanksへリダイレクトされる | ContactController@store, StoreContactRequest | 基本 |
-| | 「修正」ボタンを押す | （フォームhidden値でGET /へ戻る） | 入力データが保持された状態でお問い合わせフォームに戻る | hidden input fields | 基本 |
-| **サンクスページ** | 完了画面が表示される | GET /thanks | 送信完了メッセージが表示される | ContactController@thanks, contact.thanks | 基本 |
+| | 「修正」ボタンを押す | （フォームhidden値でGET /へ戻る） | 入力データが保持された状態でお問い合わせフォーム入力ページに戻る | hidden input fields | 基本 |
+| **サンクスページ** | サンクスページが表示される | GET /thanks | 送信完了メッセージが表示される | ContactController@thanks, contact.thanks | 基本 |
 | | 「HOME」ボタンを押す | GET / | 初期状態のお問い合わせフォームに遷移する | リンク | 基本 |
-| **管理者登録** | 登録ページを表示する | GET /register | 名前・メール・パスワード・パスワード確認の入力フォームが表示される | Fortify, auth.register | 基本 |
-| | 情報を入力して「登録」ボタンを押す | POST /register | バリデーション通過時→ユーザーが作成され /admin に遷移。失敗時→エラーメッセージ表示 | CreateNewUser, Fortify | 基本 |
-| | ヘッダーの「login」を押す | GET /login | ログインページに遷移する | リンク | 基本 |
-| **ログイン** | ログインページを表示する | GET /login | メール・パスワードの入力フォームが表示される | Fortify, auth.login | 基本 |
-| | 情報を入力して「ログイン」ボタンを押す | POST /login | バリデーション通過時→/admin に遷移。失敗時→エラーメッセージ表示。レート制限: 5回/分 | Fortify | 基本 |
-| | ヘッダーの「register」を押す | GET /register | 管理者登録ページに遷移する | リンク | 基本 |
-| **管理画面（一覧）** | 管理画面を表示する | GET /admin | お問い合わせ一覧（名前・性別・メール・内容）が7件ごとにページネーション表示される。未認証時は /login にリダイレクト | auth middleware, AdminController@index, paginate(7) | 基本 |
-| | 検索条件を入力して検索する | GET /admin + query | 名前（部分一致）・性別・カテゴリ・日付で絞り込んだ結果が表示される | IndexContactRequest, keyword/gender/category_id/date | 基本 |
+| **管理者登録画面** | 登録ページを表示する | GET /register | 名前・メール・パスワード・パスワード確認の入力フォームが表示される | Fortify, auth.register | 基本 |
+| | 情報を入力して「登録」ボタンを押す | POST /register | バリデーション通過時→ユーザーが作成され /admin に遷移。失敗時→エラーメッセージ表示<br>エラーメッセージ:<br>　a. お名前が未入力の場合：お名前を入力してください<br>　b. メールアドレスが未入力の場合：メールアドレスを入力してください<br>　c. メール形式ではない場合：メールアドレスはメール形式で入力してください<br>　d. パスワードが未入力の場合：パスワードを入力してください<br>　e. パスワードが8文字未満の場合：パスワードは8文字以上で入力してください<br>　f. 確認用パスワードが一致しない場合：パスワードと一致しません | CreateNewUser, Fortify | 基本 |
+| | ヘッダーの「login」を押す | GET /login | ログイン画面に遷移する | リンク | 基本 |
+| **ログイン画面** | ログイン画面を表示する | GET /login | メール・パスワードの入力フォームが表示される | Fortify, auth.login | 基本 |
+| | 情報を入力して「ログイン」ボタンを押す | POST /login | バリデーション通過時→/admin に遷移。失敗時→エラーメッセージ表示。レート制限: 5回/分<br>エラーメッセージ:<br>　a. メールアドレスが未入力の場合：メールアドレスを入力してください<br>　b. パスワードが未入力の場合：パスワードを入力してください<br>　c. 入力情報が誤っている場合：ログイン情報が登録されていません | Fortify | 基本 |
+| | ヘッダーの「register」を押す | GET /register | 管理者登録画面に遷移する | リンク | 基本 |
+| **管理画面（一覧）** | 管理画面を表示する | GET /admin | お問い合わせ一覧（名前・性別・メール・種類・タグ）が7件ごとにページネーション表示される。未認証時は /login にリダイレクト | auth middleware, AdminController@index, paginate(7) | 基本 |
+| | 検索条件を入力して検索する | GET /admin + query | 名前（部分一致）・メールアドレス・性別・カテゴリ・日付で絞り込んだ結果が表示される。検索欄に全て入力した状態で検索を行うことができる | IndexContactRequest, keyword/gender/category_id/date | 基本 |
 | | 「リセット」ボタンを押す | GET /admin | 検索条件がクリアされ初期状態に戻る | リンク | 基本 |
 | | 「詳細」ボタンを押す | GET /admin/contacts/{contact} | 詳細ページに遷移する | AdminController@show | 基本 |
-| | 「エクスポート」ボタンを押す | GET /contacts/export + query | 検索条件に一致するデータがBOM付きCSVとしてダウンロードされる | ContactController@export, ExportContactRequest | 応用 |
+| | 「エクスポート」ボタンを押す | GET /contacts/export + query | 検索条件に一致するデータがBOM付きCSVとしてダウンロードされる。フィルタ未指定時は全件を新着順で取得する。CSVの1行目にヘッダー行を出力し、列順は ID/氏名/性別文言/メール/電話/住所/建物/カテゴリ/詳細/作成日時 とする | ContactController@export, ExportContactRequest | 応用 |
 | | タグを追加する | POST /admin/tags | バリデーション通過時→新しいタグが作成されタグ一覧に反映され、/admin にリダイレクト。バリデーション失敗時→エラーメッセージが表示される（追加フォーム下に赤文字で表示）。name必須/<=50/ユニーク<br>エラーメッセージ:<br>　a. 未入力の場合：タグ名を入力してください<br>　b. 50文字を超えた場合：タグ名は50文字以内で入力してください<br>　c. 重複している場合：そのタグ名は既に使用されています | TagController@store, StoreTagRequest | 基本 |
 | | タグの「編集」リンクを押す | GET /admin/tags/{tag}/edit | タグ編集ページに遷移し、現在のタグ名が入力された更新フォームが表示される | TagController@edit, admin/tags/edit.blade.php | 基本 |
 | **タグ編集ページ** | タグ名を変更して「更新」ボタンを押す | PUT /admin/tags/{tag} | バリデーション通過時→タグ名が更新されタグ一覧に反映され、/admin にリダイレクト。バリデーション失敗時→エラーメッセージが編集ページの入力フォーム下に赤文字で表示される。name必須/<=50/ユニーク（自身の現在名は許可）<br>エラーメッセージ:<br>　a. 未入力の場合：タグ名を入力してください<br>　b. 50文字を超えた場合：タグ名は50文字以内で入力してください<br>　c. 重複している場合：そのタグ名は既に使用されています | TagController@update, UpdateTagRequest | 基本 |
-| | 「戻る」リンクを押す | GET /admin | 管理画面一覧に戻る | リンク | 基本 |
-| | タグを削除する | DELETE /admin/tags/{tag} | タグがタグ一覧から削除され、/admin にリダイレクト | TagController@destroy | 基本 |
-| **お問い合わせ詳細ページ** | 詳細ページが表示される | GET /admin/contacts/{contact} | 氏名・性別・メール・電話・住所・建物名・カテゴリ・お問い合わせ内容が表示される | AdminController@show, admin.show | 基本 |
+| | 「一覧に戻る」リンクを押す | GET /admin | 管理画面一覧に戻る | リンク | 基本 |
+| | タグを削除する | DELETE /admin/tags/{tag} | タグがタグ一覧から削除され、/admin にリダイレクトされる。contact_tagテーブルの関連レコードも自動で削除される | TagController@destroy | 基本 |
+| **お問い合わせ詳細ページ** | 詳細ページが表示される | GET /admin/contacts/{contact} | 名前・性別・メール・電話・住所・建物名・種類（カテゴリ）・タグ・お問い合わせ内容が表示される | AdminController@show, admin.show | 基本 |
 | | 「削除」ボタンを押す | DELETE /admin/contacts/{contact} | 該当データが削除され /admin にリダイレクト | AdminController@destroy | 基本 |
-| | 「戻る」リンクを押す | GET /admin | 管理画面一覧に戻る | リンク | 基本 |
+| | 「一覧に戻る」リンクを押す | GET /admin | 管理画面一覧に戻る | リンク | 基本 |
 | **ログアウト** | ヘッダーの「logout」ボタンを押す | POST /logout | セッションが破棄されログアウトされる | Fortify | 基本 |
-| **公開API** | お問い合わせ一覧を取得する | GET /api/v1/contacts | JSON形式でdata配列とmeta情報が返される。keyword/gender/category_id/dateで検索可能 | Api\V1\ContactController@index, IndexContactRequest, ContactResource | 応用 |
+| **公開API** | お問い合わせ一覧を取得する | GET /api/v1/contacts | JSON形式でdata配列とmeta情報（current_page, last_page, per_page, total）が返される。keyword/gender/category_id/dateで検索可能 | Api\V1\ContactController@index, IndexContactRequest, ContactResource | 応用 |
 | | お問い合わせ詳細を取得する | GET /api/v1/contacts/{contact} | JSON形式でcategory・tagsがネストされた詳細情報が返される | Api\V1\ContactController@show, ContactResource | 応用 |
-| | お問い合わせを作成する | POST /api/v1/contacts | 201 Createdで作成されたリソースのJSONが返される | Api\V1\ContactController@store, StoreContactRequest, ContactResource | 応用 |
-| | お問い合わせを更新する | PUT /api/v1/contacts/{contact} | 200 OKで更新後のリソースのJSONが返される | Api\V1\ContactController@update, UpdateContactRequest, ContactResource | 応用 |
+| | お問い合わせを作成する | POST /api/v1/contacts | 201 Createdで作成されたリソースのJSONが返される。バリデーション失敗時は422でエラーメッセージが日本語で返される | Api\V1\ContactController@store, StoreContactRequest, ContactResource | 応用 |
+| | お問い合わせを更新する | PUT /api/v1/contacts/{contact} | 200 OKで更新後のリソースのJSONが返される。バリデーション失敗時は422でエラーメッセージが日本語で返される | Api\V1\ContactController@update, UpdateContactRequest, ContactResource | 応用 |
 | | お問い合わせを削除する | DELETE /api/v1/contacts/{contact} | 204 No Contentが返される | Api\V1\ContactController@destroy | 応用 |
 
 ---
@@ -760,7 +762,7 @@ erDiagram
 | | 9 | CategorySeeder作成 | 5件のカテゴリ（商品のお届けについて等）が登録される | database/seeders/CategorySeeder.php | 基本 |
 | | 10 | TagSeeder作成 | 5件のタグ（質問、要望等）が登録される | database/seeders/TagSeeder.php | 基本 |
 | | 11 | ContactSeeder作成 | Faker(ja_JP)で20件のダミーデータが投入される | database/seeders/ContactSeeder.php | 基本 |
-| | 12 | DatabaseSeeder統合 | php artisan db:seed で全Seederがまとめて実行できる | database/seeders/DatabaseSeeder.php | 基本 |
+| | 12 | DatabaseSeeder統合 | sail artisan db:seed で全Seederがまとめて実行できる | database/seeders/DatabaseSeeder.php | 基本 |
 | **お問い合わせフォーム** | 13 | フォーム表示機能 | GET / でカテゴリ・タグが選択肢として表示される | ContactController@index, contact/index.blade.php | 基本 |
 | | 14 | StoreContactRequest作成 | 全必須項目のバリデーション、telのregex、detailのmax:120が動作する | app/Http/Requests/StoreContactRequest.php | 基本 |
 | | 15 | 確認画面表示機能 | POST /contacts/confirm でバリデーション通過後、カテゴリ名付きで入力内容が確認画面に表示される | ContactController@confirm, contact/confirm.blade.php | 基本 |
