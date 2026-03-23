@@ -709,7 +709,7 @@ erDiagram
 | **お問い合わせフォーム入力ページ** | ページを表示する | GET / | 氏名（姓・名）・性別・メール・電話・住所・建物名の入力欄が表示され、カテゴリ・タグが選択肢として表示される | ContactController@index, Category::all(), Tag::all(), contact.index | 基本 |
 | | カテゴリを選択する | （画面内操作） | categoriesテーブルのデータがドロップダウンに表示され、選択できる | Blade変数 $categories | 基本 |
 | | タグを選択する | （画面内操作） | tagsテーブルのデータがチェックボックスに表示され、複数選択できる | Blade変数 $tags | 基本 |
-| | 全項目を入力して「確認画面」ボタンを押す | POST /contacts/confirm | バリデーション通過時→お問い合わせフォーム確認ページに遷移する。失敗時→エラーメッセージが各項目下に赤文字で表示される<br>エラーメッセージ:<br>　a. 姓が未入力の場合：姓を入力してください<br>　b. 名が未入力の場合：名を入力してください<br>　c. 性別が未選択の場合：性別を選択してください<br>　d. メールアドレスが未入力の場合：メールアドレスを入力してください<br>　e. メール形式ではない場合：メールアドレスはメール形式で入力してください<br>　f. 電話番号が未入力の場合：電話番号を入力してください<br>　g. 電話番号が不正な場合：電話番号はハイフンなしの10〜11桁で入力してください<br>　h. 住所が未入力の場合：住所を入力してください<br>　i. お問い合わせの種類が未選択の場合：お問い合わせの種類を選択してください<br>　j. お問い合わせ内容が未入力の場合：お問い合わせ内容を入力してください<br>　k. お問い合わせ内容が120文字を超えた場合：お問い合わせ内容は120文字以内で入力してください<br>　l. 性別の値が不正な場合：性別の値が不正です<br>　m. 存在しないカテゴリを選択した場合：選択されたカテゴリーが存在しません<br>　n. 存在しないタグを選択した場合：選択されたタグが存在しません | StoreContactRequest, ContactController@confirm | 基本 |
+| | 全項目を入力して「確認画面」ボタンを押す | POST /contacts/confirm | バリデーション通過時→お問い合わせフォーム確認ページに遷移する。失敗時→エラーメッセージが各項目下に赤文字で表示される<br>エラーメッセージ:<br>　a. 姓が未入力の場合：姓を入力してください<br>　b. 名が未入力の場合：名を入力してください<br>　c. 性別が未選択の場合：性別を選択してください<br>　d. メールアドレスが未入力の場合：メールアドレスを入力してください<br>　e. メール形式ではない場合：メールアドレスはメール形式で入力してください<br>　f. 電話番号が未入力の場合：電話番号を入力してください<br>　g. 住所が未入力の場合：住所を入力してください<br>　h. お問い合わせの種類が未選択の場合：お問い合わせの種類を選択してください<br>　i. お問い合わせ内容が未入力の場合：お問い合わせ内容を入力してください<br>　j. お問い合わせ内容が120文字を超えた場合：お問い合わせ内容は120文字以内で入力してください | StoreContactRequest, ContactController@confirm | 基本 |
 | **お問い合わせフォーム確認ページ** | お問い合わせフォーム確認ページが表示される | POST /contacts/confirm（結果） | 入力した氏名・性別（文字列で表示）・メール・電話・住所・建物名・カテゴリ名（文字列で表示）・お問い合わせ内容が正しく表示される。タグ選択時はタグ名も文字列で表示される | contact.confirm, Category::find() | 基本 |
 | | 「送信」ボタンを押す | POST /contacts | contactsテーブルにレコードが保存され、タグがcontact_tagテーブルに記録され、/thanksへリダイレクトされる | ContactController@store, StoreContactRequest | 基本 |
 | | 「修正」ボタンを押す | （フォームhidden値でGET /へ戻る） | 入力データが保持された状態でお問い合わせフォーム入力ページに戻る | hidden input fields | 基本 |
@@ -737,8 +737,8 @@ erDiagram
 | **ログアウト** | ヘッダーの「logout」ボタンを押す | POST /logout | セッションが破棄されログアウトされる | Fortify | 基本 |
 | **公開API** | お問い合わせ一覧を取得する | GET /api/v1/contacts | JSON形式でdata配列とmeta情報（current_page, last_page, per_page, total）が返される。keyword/gender/category_id/dateで検索可能 | Api\V1\ContactController@index, IndexContactRequest, ContactResource | 応用 |
 | | お問い合わせ詳細を取得する | GET /api/v1/contacts/{contact} | JSON形式でcategory・tagsがネストされた詳細情報が返される | Api\V1\ContactController@show, ContactResource | 応用 |
-| | お問い合わせを作成する | POST /api/v1/contacts | 201 Createdで作成されたリソースのJSONが返される。バリデーション失敗時は422でエラーメッセージが日本語で返される | Api\V1\ContactController@store, StoreContactRequest, ContactResource | 応用 |
-| | お問い合わせを更新する | PUT /api/v1/contacts/{contact} | 200 OKで更新後のリソースのJSONが返される。バリデーション失敗時は422でエラーメッセージが日本語で返される | Api\V1\ContactController@update, UpdateContactRequest, ContactResource | 応用 |
+| | お問い合わせを作成する | POST /api/v1/contacts | 201 Createdで作成されたリソースのJSONが返される。バリデーション失敗時は422でエラーメッセージが日本語で返される。返却されるエラーメッセージは、「お問い合わせフォーム入力ページ」のバリデーションエラーメッセージに加え、以下を含む。<br>　g. 電話番号が不正な場合：電話番号はハイフンなしの10〜11桁で入力してください<br>　h. 性別の値が不正な場合：性別の値が不正です<br>　i. 存在しないカテゴリを選択した場合：選択されたカテゴリーが存在しません<br>　j. 存在しないタグを選択した場合：選択されたタグが存在しません | Api\V1\ContactController@store, StoreContactRequest, ContactResource | 応用 |
+| | お問い合わせを更新する | PUT /api/v1/contacts/{contact} | 200 OKで更新後のリソースのJSONが返される。バリデーション失敗時は422でエラーメッセージが日本語で返される。返却されるエラーメッセージは、「お問い合わせフォーム入力ページ」のバリデーションエラーメッセージに加え、以下を含む。<br>　g. 電話番号が不正な場合：電話番号はハイフンなしの10〜11桁で入力してください<br>　h. 性別の値が不正な場合：性別の値が不正です<br>　i. 存在しないカテゴリを選択した場合：選択されたカテゴリーが存在しません<br>　j. 存在しないタグを選択した場合：選択されたタグが存在しません | Api\V1\ContactController@update, UpdateContactRequest, ContactResource | 応用 |
 | | お問い合わせを削除する | DELETE /api/v1/contacts/{contact} | 204 No Contentが返される | Api\V1\ContactController@destroy | 応用 |
 
 ---
