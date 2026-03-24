@@ -217,3 +217,15 @@ sail artisan test --coverage
 - CSVエクスポート
 - タグ管理（追加・更新・削除）
 - 公開API（お問い合わせCRUD）
+
+## APIエンドポイント一覧
+
+認証不要の公開APIです。全エンドポイントは `/api/v1` プレフィックス配下に定義されています。
+
+| HTTPメソッド | URI | 概要 |
+|---|---|---|
+| GET | /api/v1/contacts | お問い合わせ一覧（検索・ページネーション付き） |
+| GET | /api/v1/contacts/{contact} | お問い合わせ詳細（カテゴリ・タグ含む） |
+| POST | /api/v1/contacts | お問い合わせ新規作成 |
+| PUT | /api/v1/contacts/{contact} | お問い合わせ更新 |
+| DELETE | /api/v1/contacts/{contact} | お問い合わせ削除 |
