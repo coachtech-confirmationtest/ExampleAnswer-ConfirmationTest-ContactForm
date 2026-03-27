@@ -64,17 +64,20 @@ erDiagram
 
     contact_tag {
         bigint_unsigned id PK
-        bigint_unsigned contact_id FK
+        bigint_unsigned contact_id FK "UNIQUE(contact_id, tag_id)"
         bigint_unsigned tag_id FK
         timestamp created_at
         timestamp updated_at
     }
-    %% UNIQUE(contact_id, tag_id)
 
     categories ||--o{ contacts : "has many"
     contacts ||--o{ contact_tag : "has many"
     tags ||--o{ contact_tag : "has many"
 ```
+
+## 開発環境URL
+
+http://localhost
 
 ## 動作環境
 

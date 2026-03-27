@@ -38,6 +38,7 @@
 | | 環境構築手順 | 上記「初期設定手順」を参考に、誰でも環境構築ができるように詳細に記載 | |
 | | 使用技術 | Laravel 10, MySQL 8.0, Nginx, Dockerなど、使用した技術スタック一覧 | |
 | | APIエンドポイント一覧 | 実装したAPIのエンドポイント一覧（メソッド・パス・概要） | |
+| | 開発環境URL | 開発環境のURL（例: http://localhost ） | |
 | | 作成者 | 自分の名前 | |
 | コード品質担保のための指示 | 命名規則 | ・Laravelの標準命名規則（PSR-12準拠）に従うこと<br> - 変数/メソッド: `camelCase`<br> - クラス: `PascalCase`<br> - DBテーブル: `snake_case`（複数形）<br> - DBカラム: `snake_case`（単数形）<br> - モデル名：アッパーキャメル<br> - コントローラー名：アッパーキャメル<br> - フォームリクエスト名：アッパーキャメル<br> - マイグレーションファイル名：スネークケース<br> - シーディングファイル名：アッパーキャメル<br>・変数名やメソッド名に `a`, `x` など意味のない命名をしないこと<br>・ローマ字（例: `okyakusama`）など英単語ではないもので命名しないこと | |
 | | コードフォーマット | ・Laravel Pintを使用してコードを自動整形すること<br>・コミット前に `vendor/bin/pint` または `sail bin pint` を実行し、整形されたコードをコミットする<br>・採点基準: `sail bin pint --test` を実行し「No fixable issues were found」と表示されること | |
@@ -56,7 +57,6 @@
 ## 3. 環境構築手順
 
 こちらは初期プロジェクトのセッティングにおいて必要な環境構築手順を記載したものです。
-詳細な内容は、coachtech-prepared-blade-list/Preparedblade-ConfirmationTest-ContactForm リポジトリの環境構築.mdを参照して下さい。
 採点時の環境はこちらで行いますので、違う手順によって環境構築された場合は採点を致しかねます。ご注意してください。
 
 | 手順 | カテゴリ |
@@ -64,10 +64,11 @@
 | 1. Laravelプロジェクトの作成 (Laravel 10.x) | 注意: curl -s "https://laravel.build/..." は最新版のLaravelをインストールするため、今回は使用しません。<br><br>以下のDockerコマンドを実行して、Laravel 10.xを明示的に指定してプロジェクトを作成します。<br><br>`docker run --rm -u "$(id -u):$(id -g)" -v "$(pwd):/var/www/html" -w /var/www/html -e COMPOSER_CACHE_DIR=/tmp/composer_cache laravelsail/php82-composer:latest composer create-project laravel/laravel:^10.0 contact-form-app` |
 | 2. Laravel Sailのインストール | プロジェクト作成後、contact-form-app ディレクトリに移動し、Laravel Sailをインストールします。<br><br>`cd contact-form-app`<br><br>`docker run --rm -u "$(id -u):$(id -g)" -v "$(pwd):/var/www/html" -w /var/www/html -e COMPOSER_CACHE_DIR=/tmp/composer_cache laravelsail/php82-composer:latest composer require laravel/sail --dev`<br><br>`docker run --rm -u "$(id -u):$(id -g)" -v "$(pwd):/var/www/html" -w /var/www/html -e COMPOSER_CACHE_DIR=/tmp/composer_cache laravelsail/php82-composer:latest php artisan sail:install --with=mysql`<br><br>※M1/M2/M3 Mac（Apple Silicon）をお使いの方<br>Apple Silicon搭載のMacでは、`sail up -d`実行時にエラーが発生することがあります。<br>解決方法: `compose.yaml`を開き、mysqlサービスとphpmyadminサービスに`platform: 'linux/amd64'`を追加してください。 |
 | 3. .env ファイルの設定 | .env ファイルを開き、データベース接続情報が以下と一致していることを確認します。<br><br>DB_CONNECTION=mysql<br>DB_HOST=mysql<br>DB_PORT=3306<br>DB_DATABASE=laravel<br>DB_USERNAME=sail<br>DB_PASSWORD=password<br><br>重要: DB_HOST は localhost や 127.0.0.1 ではなく、Dockerコンテナ名である mysql を指定します。 |
-| 4. フロントエンドのセットアップ (Vite & Tailwind CSS) | 本プロジェクトでは、フロントエンドのスタイリングにTailwind CSSを使用します。<br><br>1. NPM依存パッケージのインストール<br>> 重要: sail npm install を実行する前に、必ずSailコンテナが起動していることを確認してください。<br>`sail npm install`<br><br>2. Tailwind CSSのインストール<br>`sail npm install -D tailwindcss@^3.4.0 postcss autoprefixer`<br>`sail npm install alpinejs`<br><br>3. 設定ファイルの生成<br>`sail npx tailwindcss init -p`<br><br>4. Tailwind CSSのテンプレートパス設定<br>tailwind.config.js を開き、以下のように設定します。<br><br>`export default { content: ["./resources/**/*.blade.php", "./resources/**/*.js", "./resources/**/*.vue"], theme: { extend: {} }, plugins: [] }`<br><br>5. 本プロジェクトのresourcesファイルをPreparedblade-ConfirmationTest-ContactForm リポジトリのresourcesファイルと入れ替え<br><br>6. Vite開発サーバーの起動<br>`sail npm run dev`<br>注意: sail npm run dev は実行したままにしておく必要があります。 |
+| 4. フロントエンドのセットアップ (Vite & Tailwind CSS) | 本プロジェクトでは、フロントエンドのスタイリングにTailwind CSSを使用します。<br><br>1. NPM依存パッケージのインストール<br>> 重要: sail npm install を実行する前に、必ずSailコンテナが起動していることを確認してください。<br>`sail npm install`<br><br>2. Tailwind CSSのインストール<br>`sail npm install -D tailwindcss@^3.4.0 postcss autoprefixer`<br>`sail npm install alpinejs`<br><br>3. 設定ファイルの生成<br>`sail npx tailwindcss init -p`<br><br>4. Tailwind CSSのテンプレートパス設定<br>tailwind.config.js を開き、以下のように設定します。<br><br>`export default { content: ["./resources/**/*.blade.php", "./resources/**/*.js", "./resources/**/*.vue"], theme: { extend: {} }, plugins: [] }`<br><br>5. 提供リポジトリのresourcesディレクトリと入れ替え<br>以下のリポジトリをクローンし、resourcesディレクトリを丸ごと入れ替えます。<br>`git clone https://github.com/coachtech-prepared-file/Preparedblade-ConfirmationTest-ContactForm.git`<br><br>入れ替え手順:<br>① Finderでプロジェクトフォルダを開きます。<br>`open .`<br>② プロジェクト内の `resources` フォルダを削除します。<br>③ クローンしたリポジトリ内の `resources` フォルダをプロジェクト直下にコピーします。<br><br>※コマンド操作に慣れている場合は `rm -rf` と `cp -r` でも可能ですが、誤削除を防ぐためFinderでの操作を推奨します。<br><br>6. Vite開発サーバーの起動<br>`sail npm run dev`<br>注意: sail npm run dev は実行したままにしておく必要があります。 |
 | 5. phpMyAdminの追加 | compose.yaml を開き、mysql サービスの後にphpmyadminサービスの設定を追加してください。<br><br>image: 'phpmyadmin:latest'<br>ports: '${FORWARD_PHPMYADMIN_PORT:-8080}:80'<br>environment: PMA_HOST=mysql, PMA_USER='${DB_USERNAME}', PMA_PASSWORD='${DB_PASSWORD}'<br>networks: sail<br>depends_on: mysql |
 | 6. Sailの起動とエイリアス設定 | `./vendor/bin/sail up -d`<br><br>Zsh（macOS）の場合:<br>`echo "alias sail=\"[ -f sail ] && bash sail \|\| bash vendor/bin/sail\"" >> ~/.zshrc`<br>`source ~/.zshrc`<br><br>Bash（Linux/WSL）の場合:<br>`echo "alias sail='[ -f sail ] && bash sail \|\| bash vendor/bin/sail'" >> ~/.bashrc`<br>`source ~/.bashrc` |
 | 7. アプリケーションキーの生成 | ルートで以下のコマンドを実行する<br>`sail artisan key:generate` |
+| 8. データベースのマイグレーションと初期データ投入 | 以下のコマンドでテーブルを作成し、初期データを投入します。<br>`sail artisan migrate --seed`<br><br>※既存のデータベースをリセットしたい場合は以下を実行してください。<br>`sail artisan migrate:fresh --seed` |
 
 ---
 
@@ -641,12 +642,11 @@ erDiagram
 
     contact_tag {
         bigint_unsigned id PK
-        bigint_unsigned contact_id FK
+        bigint_unsigned contact_id FK "UNIQUE(contact_id, tag_id)"
         bigint_unsigned tag_id FK
         timestamp created_at
         timestamp updated_at
     }
-    %% UNIQUE(contact_id, tag_id)
 
     categories ||--o{ contacts : "has many"
     contacts ||--o{ contact_tag : "has many"
